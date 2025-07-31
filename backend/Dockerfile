@@ -1,26 +1,20 @@
-# ---- Builder image ----
-# Use slim Python image to keep the final image small
-FROM python:3.11-slim AS base
+# backend/Dockerfile
 
-# Prevent Python from writing .pyc files and enable stdout/stderr buffering
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+# 1. Base image
+FROM python:3.11-slim
 
-# Set the working directory in the container
+# 2. Directorio de trabajo
 WORKDIR /app
 
-# Copy only the requirements first, to leverage Docker layer caching
-COPY requirements.txt ./
+# 3. Copiar únicamente el requirements para aprovechar cache de Docker
+COPY backend/requirements.txt ./requirements.txt
 
-# Install dependencies
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+# 4. Instalar dependencias
+RUN pip install --upgrade pip \
+    && pip install -r requirements.txt
 
-# Copy the rest of the application code
-COPY . .
+# 5. Copiar el resto del backend
+COPY backend/ /app
 
-# Expose the port FastAPI will run on
-EXPOSE 8000
-
-# Default command to run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 6. Comando de arranque
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "${PORT:-8000}"]
