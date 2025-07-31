@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "jsx": "react",
+    // or "react-jsx" for React 17+ (recommended)
+    "esModuleInterop": true,
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "forceConsistentCasingInFileNames": true,
+    "strict": true
+    // ...other options
+  }
+}
