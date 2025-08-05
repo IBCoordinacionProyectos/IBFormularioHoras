@@ -8,17 +8,19 @@ PORT = "8000"
 
 # ------------------- FASES PERSONALIZADAS -------------------
 
-# En setup instalamos Python, Node.js y pip vía Nix
+# En setup instalamos Python (con pip), Node.js y sus dependencias básicas.
 [phases.setup]
 nixPkgs = [
-  "python311",
-  "nodejs",
-  "python311Packages.pip"
+  "python311Full",   # Incluye el ejecutable pip en el perfil
+  "nodejs"
 ]
 
-# En install usamos python -m pip para asegurarnos de usar el pip instalado en el entorno
+# En install primero bootstrapeamos pip y luego instalamos dependencias.
 [phases.install]
 cmds = [
+  # Asegurarnos de que el módulo pip está disponible
+  "python -m ensurepip --upgrade",
+  # Ahora ya podemos usar pip
   "python -m pip install --upgrade pip",
   "python -m pip install -r backend/requirements.txt",
   "cd frontend && npm ci --legacy-peer-deps && npm run build"
