@@ -2,19 +2,21 @@
 # Configuración para desplegar monorepo (backend FastAPI + frontend React)
 # con Dokploy utilizando Railway/Nixpacks.
 
-# Variables de entorno por defecto
 [variables]
 # Puerto de la aplicación web (FastAPI)
 PORT = "8000"
 
 # ------------------- FASES PERSONALIZADAS -------------------
 
-# `setup` instala los paquetes de sistema necesarios.
+# En setup instalamos Python, Node.js y pip vía Nix
 [phases.setup]
-# Paquetes de nix que necesitamos para construir python y node
-nixPkgs = ["python311", "nodejs"]
+nixPkgs = [
+  "python311",
+  "nodejs",
+  "python311Packages.pip"
+]
 
-# `install` instala dependencias de backend y frontend.
+# En install usamos python -m pip para asegurarnos de usar el pip instalado en el entorno
 [phases.install]
 cmds = [
   "python -m pip install --upgrade pip",
@@ -22,14 +24,10 @@ cmds = [
   "cd frontend && npm ci --legacy-peer-deps && npm run build"
 ]
 
-# Ningún comando de build adicional es necesario (las salidas ya se crearon).
-
 # --------------- COMANDOS DE INICIO -------------------------
 [start]
-# Servir FastAPI (backend)
 cmd = "python -m uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT"
 
 # --------------- ARCHIVOS ESTÁTICOS -------------------------
-# Indica a Dokploy que la carpeta build contiene el frontend estático.
 [static]
 dir = "frontend/build"
