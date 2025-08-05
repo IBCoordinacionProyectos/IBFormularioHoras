@@ -5,30 +5,33 @@
 FROM node:18-alpine AS build
 WORKDIR /app
 
-# Instalación de dependencias
+# Copiar package.json e instalar dependencias
 COPY package*.json ./
 RUN npm ci --legacy-peer-deps && \
-    # Asegurar permisos de ejecutables (react-scripts)
-    chmod +x ./node_modules/.bin/react-scripts
+    # Asegurar permisos de ejecutables en node_modules bin
+    chmod -R a+x node_modules/.bin
 
-# Copia el resto del código y define la URL del backend
+# Copiar el resto del código fuente
 COPY . .
+
+# Definir la URL del backend para la aplicación React
 ARG REACT_APP_API_URL=http://185.92.182.173:8000
 ENV REACT_APP_API_URL=${REACT_APP_API_URL}
 
-# Compila para producción
+# Compilar la aplicación para producción
 RUN npm run build
-
 
 # Stage 2: Servir con Nginx
 FROM nginx:stable-alpine
-# Limpia la carpeta por defecto de nginx
+
+# Limpiar contenido por defecto de nginx
 RUN rm -rf /usr/share/nginx/html/*
-# Copia el build generado
+
+# Copiar build desde el stage de construcción
 COPY --from=build /app/build /usr/share/nginx/html
 
-# Expone el puerto 80 para HTTP
+# Exponer puerto HTTP
 EXPOSE 80
 
-# Inicia Nginx en primer plano
+# Comando por defecto: iniciar Nginx en primer plano
 CMD ["nginx", "-g", "daemon off;"]
