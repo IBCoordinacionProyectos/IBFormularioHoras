@@ -5,6 +5,10 @@
 FROM node:18-slim AS build
 WORKDIR /app
 
+# Variables de entorno para optimizar el build
+ENV CI=true \
+    GENERATE_SOURCEMAP=false
+
 # Copiar package.json e instalar dependencias
 COPY package*.json ./
 RUN npm ci --legacy-peer-deps
