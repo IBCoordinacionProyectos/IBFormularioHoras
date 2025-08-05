@@ -7,7 +7,9 @@ WORKDIR /app
 
 # Instalación de dependencias
 COPY package*.json ./
-RUN npm ci --legacy-peer-deps
+RUN npm ci --legacy-peer-deps && \
+    # Asegurar permisos de ejecutables (react-scripts)
+    chmod +x ./node_modules/.bin/react-scripts
 
 # Copia el resto del código y define la URL del backend
 COPY . .
