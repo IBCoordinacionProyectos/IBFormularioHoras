@@ -7,12 +7,12 @@ ENV PYTHONUNBUFFERED=1 \
     PORT=8000
 
 # 3. Instala dependencias del backend
-COPY backend/requirements.txt ./  
+COPY requirements.txt ./  
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # 4. Copia el código del backend
-COPY backend/ ./backend
+COPY . ./
 
 # 5. (Opcional) Crear usuario no-root
 RUN adduser --disabled-password --gecos "" appuser && \
