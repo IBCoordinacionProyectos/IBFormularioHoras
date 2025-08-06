@@ -1,7 +1,7 @@
 // horasApi.ts
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://backend.yeisonduque.top/';
 
 export const submitHours = async (data: any) => {
     try {
