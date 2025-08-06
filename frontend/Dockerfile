@@ -1,5 +1,7 @@
 # Etapa de construcción
 FROM node:18-slim AS build
+
+# Establecer el directorio de trabajo
 WORKDIR /app
 
 # Variables de entorno para optimizar el build
@@ -8,10 +10,17 @@ ENV CI=true \
 
 # Copiar package.json e instalar dependencias
 COPY package*.json ./
-RUN npm ci --legacy-peer-deps
+
+# Instalar dependencias y react-scripts globalmente
+RUN npm install -g react-scripts && \
+    npm ci --legacy-peer-deps --unsafe-perm && \
+    chown -R node:node /app
+
+# Cambiar al usuario node para evitar problemas de permisos
+USER node
 
 # Copiar el resto del código fuente
-COPY . .
+COPY --chown=node:node . .
 
 # Compilar la aplicación para producción
 RUN npm run build
