@@ -1,15 +1,18 @@
 # main.py
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware # Importa esto
-from .routers import projects, activities, hours, employees
+from fastapi import FastAPI, status
+from fastapi.middleware.cors import CORSMiddleware
+from .routers import projects, activities, hours, employees, daily_activities, auth
 
 app = FastAPI()
 
-# Configuración de CORS - ¡Verifica que esto esté en tu archivo!
+# Configuración de CORS
 origins = [
     "http://localhost",
-    "http://localhost:3000", # ¡Este es CRUCIAL para tu frontend!
-    # Puedes añadir otros orígenes aquí si tu frontend se despliega en otro lugar
+    "http://localhost:3000",
+    "https://yeisonduque.top",
+    "https://www.yeisonduque.top",
+    "https://backend.yeisonduque.top",
+    "http://horas.yeisonduque.top",
 ]
 
 app.add_middleware(
@@ -32,3 +35,8 @@ app.include_router(auth.router)
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the API"}
+
+@app.get("/health", status_code=status.HTTP_200_OK)
+def health_check():
+    """Endpoint de verificación de salud del servicio"""
+    return {"status": "ok", "message": "Service is running"}
