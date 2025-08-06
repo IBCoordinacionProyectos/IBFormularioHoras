@@ -4,7 +4,7 @@ WORKDIR /app
 
 # 2. Variables de entorno
 ENV PYTHONUNBUFFERED=1 \
-    PORT=5000
+    PORT=8000
 
 # 3. Instala dependencias del backend
 COPY backend/requirements.txt ./  
@@ -25,4 +25,4 @@ HEALTHCHECK --interval=30s --timeout=3s \
   CMD curl -f http://localhost:${PORT}/health || exit 1
 
 # 7. Comando de arranque
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "5000", "--log-level", "debug"]
+CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug"]
