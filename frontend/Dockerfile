@@ -12,9 +12,8 @@ ENV CI=true \
 COPY package*.json ./
 
 # Instalar dependencias y react-scripts globalmente
-RUN npm install -g react-scripts && \
-    npm ci --legacy-peer-deps --unsafe-perm && \
-    chown -R node:node /app
+RUN npm install -g react-scripts && npm ci --legacy-peer-deps --unsafe-perm && chown -R node:node /app
+
 
 # Cambiar al usuario node para evitar problemas de permisos
 USER node
