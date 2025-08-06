@@ -1,7 +1,4 @@
-# Dockerfile para el Frontend React 
-# Se conecta al backend en 185.92.182.173:8000
-
-# Stage 1: Construcción de la aplicación
+# Etapa de construcción
 FROM node:18-slim AS build
 WORKDIR /app
 
@@ -16,27 +13,23 @@ RUN npm ci --legacy-peer-deps
 # Copiar el resto del código fuente
 COPY . .
 
-# Asegurar permisos de ejecución en react-scripts
-RUN chmod +x node_modules/.bin/react-scripts
-
-# Definir la URL del backend para la aplicación React
-ARG REACT_APP_API_URL=http://185.92.182.173:8000
-ENV REACT_APP_API_URL=${REACT_APP_API_URL}
-
 # Compilar la aplicación para producción
 RUN npm run build
 
-# Stage 2: Servir con Nginx
+# Etapa de producción
 FROM nginx:stable-alpine
 
 # Limpiar contenido por defecto de nginx
 RUN rm -rf /usr/share/nginx/html/*
 
-# Copiar build desde el stage de construcción
-COPY --from=build /app/build /usr/share/nginx/html
+# Copiar la aplicación construida
+COPY --from=build /app/build/ /usr/share/nginx/html/
 
-# Exponer puerto HTTP
+# Copiar configuración personalizada de nginx
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Exponer el puerto 80
 EXPOSE 80
 
-# Comando por defecto: iniciar Nginx en primer plano
+# Iniciar nginx
 CMD ["nginx", "-g", "daemon off;"]
