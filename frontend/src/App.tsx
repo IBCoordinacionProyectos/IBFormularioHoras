@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
+import { Toaster } from 'sonner';
+
+// Application components
 import FormularioHoras from './components/FormularioHoras';
 import LoginPage from './components/LoginPage';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 
 interface AuthenticatedUser {
   id: number;
@@ -10,10 +11,19 @@ interface AuthenticatedUser {
 }
 
 function App() {
-  const [authenticatedUser, setAuthenticatedUser] = useState<AuthenticatedUser | null>(null);
+  const [authenticatedUser, setAuthenticatedUser] = useState<AuthenticatedUser | null>(() => {
+    // Comprueba la variable de entorno para saltar el login en modo de desarrollo.
+    if (process.env.REACT_APP_SKIP_LOGIN === 'true') {
+      return { id: 999, name: 'Usuario de Desarrollo' }; // Usuario de prueba
+    }
+    return null;
+  });
 
   const handleLoginSuccess = (userData: { employee_id: number; employee_name: string }) => {
-    setAuthenticatedUser({ id: userData.employee_id, name: userData.employee_name });
+    setAuthenticatedUser({ 
+      id: userData.employee_id, 
+      name: userData.employee_name 
+    });
   };
 
   const handleLogout = () => {
@@ -21,29 +31,31 @@ function App() {
   };
 
   const handleSuccess = () => {
-    console.log("Operación exitosa, actualizando resumen...");
-    // Esta función se mantiene por si es necesaria para otros componentes.
+    console.log("Operation successful, summary update might be needed.");
   };
 
   return (
-    <div className="h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex flex-col p-4 sm:p-6 md:p-8 overflow-hidden">
-      <ToastContainer />
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      <Toaster position="top-right" richColors />
       
-
-      <div className="flex-grow flex flex-col min-h-0">
+      <main className="flex-1 w-full">
         {authenticatedUser ? (
-            <FormularioHoras 
-              onSuccess={handleSuccess} 
-              employeeId={authenticatedUser.id} 
-              employeeName={authenticatedUser.name}
-              onLogout={handleLogout}
-            />
+          <FormularioHoras 
+            onSuccess={handleSuccess} 
+            employeeId={authenticatedUser.id} 
+            employeeName={authenticatedUser.name}
+            onLogout={handleLogout}
+          />
         ) : (
-          <div className="h-full flex items-center justify-center">
-            <LoginPage onLoginSuccess={handleLoginSuccess} />
+          <div className="flex items-center justify-center h-screen">
+            <div className="w-full max-w-md p-4">
+              <LoginPage onLoginSuccess={handleLoginSuccess} />
+            </div>
           </div>
         )}
-      </div>
+      </main>
+
+      {/* Footer can be added back if needed */}
     </div>
   );
 }

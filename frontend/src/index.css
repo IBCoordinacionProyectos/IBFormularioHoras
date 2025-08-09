@@ -1,3 +1,120 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    /* Marca */
+    --brand: 48 96% 50%; /* #FBE304 */
+    --brand-foreground: 195 78% 16%; /* #093C4D */
+
+    /* Superficies */
+    --background: 0 0% 100%;
+    --foreground: 195 78% 16%;
+    --surface-strong: 195 78% 16%;
+    --surface-strong-foreground: 0 0% 100%;
+    
+    /* Componentes Card, Popover, etc. */
+    --card: 0 0% 100%;
+    --card-foreground: 195 78% 16%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 195 78% 16%;
+    
+    /* Bordes y Muted */
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215 20% 65.1%;
+    
+    /* Estados */
+    --primary: 48 96% 50%;
+    --primary-foreground: 195 78% 16%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 195 78% 16%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Foco y Radio */
+    --ring: 48 96% 50%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* Marca */
+    --brand: 48 96% 50%;
+    --brand-foreground: 195 78% 16%;
+
+    /* Superficies */
+    --background: 195 60% 12%; /* #0B2A34 */
+    --foreground: 210 40% 98%;
+    --surface-strong: 195 78% 16%;
+    --surface-strong-foreground: 0 0% 100%;
+
+    /* Componentes */
+    --card: 195 55% 15%;
+    --card-foreground: 210 40% 98%;
+    --popover: 195 60% 12%;
+    --popover-foreground: 210 40% 98%;
+
+    /* Bordes y Muted */
+    --border: 195 40% 25%;
+    --input: 195 40% 25%;
+    --muted: 195 40% 20%;
+    --muted-foreground: 215 20% 65.1%;
+
+    /* Estados */
+    --primary: 48 96% 50%;
+    --primary-foreground: 195 78% 16%;
+    --secondary: 195 40% 20%;
+    --secondary-foreground: 210 40% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Foco y Radio */
+    --ring: 48 96% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100 dark:bg-gray-800;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 dark:bg-gray-600 rounded-full hover:bg-gray-400 dark:hover:bg-gray-500;
+}
+
+/* Focus styles */
+*:focus-visible {
+  @apply outline-none ring-2 ring-brand ring-offset-2 ring-offset-background;
+}
+
+/* Remove default button focus */
+button:focus-visible {
+  @apply ring-2 ring-brand ring-offset-2 ring-offset-background;
+}

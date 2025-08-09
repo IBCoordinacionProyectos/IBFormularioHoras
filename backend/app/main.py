@@ -9,6 +9,7 @@ app = FastAPI()
 origins = [
     "http://localhost",
     "http://localhost:3000",
+    "http://localhost:3001",
     "https://yeisonduque.top",
     "https://www.yeisonduque.top",
     "https://backend.yeisonduque.top",
@@ -23,7 +24,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from .routers import projects, activities, hours, employees, daily_activities, auth  # Nuevo import
 
 app.include_router(daily_activities.router, prefix="/daily-activities", tags=["daily-activities"])
 app.include_router(projects.router, prefix="/projects", tags=["projects"])
