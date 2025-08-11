@@ -1,7 +1,7 @@
 # =========================
 # Etapa de dependencias
 # =========================
-FROM node:20-slim AS deps
+FROM node:20-alpine AS deps
 
 WORKDIR /app
 ENV NODE_ENV=production
@@ -16,12 +16,13 @@ COPY vite.config.ts ./
 # Limpiar caché y reinstalar dependencias
 RUN rm -rf node_modules package-lock.json && \
     npm cache clean --force && \
-    npm install --include=optional --legacy-peer-deps
+    npm install --legacy-peer-deps && \
+    npm install -g npm@latest
 
 # =========================
 # Etapa de build
 # =========================
-FROM node:20-slim AS build
+FROM node:20-alpine AS build
 
 WORKDIR /app
 ENV NODE_ENV=production
@@ -33,10 +34,11 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # 🔹 FIX de permisos para que vite pueda ejecutarse
+# Asegurarse de que los binarios son ejecutables
 RUN chmod +x node_modules/.bin/*
 
-# Compilar la aplicación
-RUN npm run build
+# Compilar la aplicación con más memoria disponible
+RUN NODE_OPTIONS=--max_old_space_size=4096 npm run build
 
 # =========================
 # Etapa de producción
