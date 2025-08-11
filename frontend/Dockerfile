@@ -1,5 +1,5 @@
 # =========================
-# Etapa de construcción
+# Etapa de dependencias
 # =========================
 FROM node:20-slim AS deps
 
@@ -13,13 +13,13 @@ COPY tailwind.config.js ./
 COPY postcss.config.js ./
 COPY vite.config.ts ./
 
-# Limpiar caché y forzar reinstalación de dependencias
+# Limpiar caché y reinstalar dependencias
 RUN rm -rf node_modules package-lock.json && \
     npm cache clean --force && \
     npm install --include=optional --legacy-peer-deps
 
 # =========================
-# Etapa de construcción real
+# Etapa de build
 # =========================
 FROM node:20-slim AS build
 
@@ -32,6 +32,9 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copiar el resto del código fuente
 COPY . .
 
+# 🔹 FIX de permisos para que vite pueda ejecutarse
+RUN chmod +x node_modules/.bin/*
+
 # Compilar la aplicación
 RUN npm run build
 
@@ -43,10 +46,10 @@ FROM nginx:stable-alpine AS production
 # Limpiar contenido por defecto
 RUN rm -rf /usr/share/nginx/html/*
 
-# Copiar artefactos (incluye .gz y .br generados por Vite)
+# Copiar artefactos compilados (incluye .gz y .br generados por Vite)
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Configuración de Nginx optimizada para SPA y precomprimidos
+# Configuración optimizada para SPA
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
