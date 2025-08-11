@@ -1,47 +1,40 @@
 # =========================
 # Etapa de construcción
 # =========================
-FROM node:18-slim AS build
+FROM node:20-slim AS build
 
-# Directorio de trabajo
 WORKDIR /app
-
-# Variables de entorno para build
 ENV NODE_ENV=production
 
-# Copiar solo archivos necesarios para instalar dependencias
+# Copiar archivos base para dependencias
 COPY package*.json ./
 COPY tsconfig.json ./ 
 COPY tailwind.config.js ./ 
 COPY postcss.config.js ./ 
 COPY vite.config.ts ./
 
-# Instalar dependencias (incluyendo devDependencies para el build)
+# Instalar dependencias (incluyendo devDependencies)
 RUN npm ci --legacy-peer-deps
 
-# Copiar el resto del código fuente
+# Copiar resto del código
 COPY . .
 
-# Compilar la aplicación (salida: dist/)
-RUN npm run build
+# Dar permisos y compilar
+RUN chmod +x node_modules/.bin/vite && npm run build
 
 # =========================
 # Etapa de producción
 # =========================
 FROM nginx:stable-alpine AS production
 
-# Limpiar contenido por defecto de Nginx
+# Limpiar contenido por defecto
 RUN rm -rf /usr/share/nginx/html/*
 
-# Copiar la aplicación compilada desde la etapa anterior
+# Copiar app compilada con archivos .br y .gz
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Copiar configuración personalizada de Nginx
-# Asegúrate que este archivo incluya la regla SPA con try_files
+# Copiar configuración Nginx optimizada
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Exponer el puerto
 EXPOSE 80
-
-# Iniciar Nginx en primer plano
 CMD ["nginx", "-g", "daemon off;"]
