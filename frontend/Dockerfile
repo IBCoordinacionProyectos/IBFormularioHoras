@@ -1,26 +1,39 @@
 # =========================
 # Etapa de construcción
 # =========================
-FROM node:20-slim AS build
+FROM node:20-slim AS deps
 
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Copiar archivos base para resolver dependencias
+# Copiar solo los archivos necesarios para instalar dependencias
 COPY package*.json ./
 COPY tsconfig.json ./
 COPY tailwind.config.js ./
 COPY postcss.config.js ./
 COPY vite.config.ts ./
 
-# Instalación robusta (incluye optionalDependencies como los binarios de Rollup)
-RUN npm install --include=optional --legacy-peer-deps
+# Limpiar caché y forzar reinstalación de dependencias
+RUN rm -rf node_modules package-lock.json && \
+    npm cache clean --force && \
+    npm install --include=optional --legacy-peer-deps
+
+# =========================
+# Etapa de construcción real
+# =========================
+FROM node:20-slim AS build
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Copiar dependencias instaladas
+COPY --from=deps /app/node_modules ./node_modules
 
 # Copiar el resto del código fuente
 COPY . .
 
-# Compilar (aseguramos permisos del binario de Vite en imágenes slim)
-RUN chmod +x node_modules/.bin/vite && npm run build
+# Compilar la aplicación
+RUN npm run build
 
 # =========================
 # Etapa de producción
