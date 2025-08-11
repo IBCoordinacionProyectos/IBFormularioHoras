@@ -2,56 +2,55 @@
 # Etapa de dependencias
 # =========================
 FROM node:20-alpine AS deps
-
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Copiar solo los archivos necesarios para instalar dependencias
+# Archivos mínimos para resolver dependencias
 COPY package*.json ./
 COPY tsconfig.json ./
 COPY tailwind.config.js ./
 COPY postcss.config.js ./
 COPY vite.config.ts ./
 
-# Limpiar caché y reinstalar dependencias
+# Instalación robusta (incluye optionalDependencies)
 RUN rm -rf node_modules package-lock.json && \
     npm cache clean --force && \
-    npm install --legacy-peer-deps && \
-    npm install -g npm@latest
+    npm install --legacy-peer-deps
 
 # =========================
 # Etapa de build
 # =========================
 FROM node:20-alpine AS build
-
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Copiar dependencias instaladas
+# Copiamos node_modules ya resueltos para Alpine (musl)
 COPY --from=deps /app/node_modules ./node_modules
 
-# Copiar el resto del código fuente
+# Copiamos el resto del código
 COPY . .
 
-# 🔹 FIX de permisos para que vite pueda ejecutarse
-# Asegurarse de que los binarios son ejecutables
-RUN chmod +x node_modules/.bin/*
+# 🔧 FIX: forzar binario nativo de Rollup para Alpine (musl) con la versión exacta instalada
+RUN ROLLUP_VERSION=$(node -p "require('./node_modules/rollup/package.json').version") && \
+    npm i -D @rollup/rollup-linux-x64-musl@${ROLLUP_VERSION} --no-save
 
-# Compilar la aplicación con más memoria disponible
-RUN NODE_OPTIONS=--max_old_space_size=4096 npm run build
+# Permisos para binarios (vite, etc.) y build
+RUN chmod +x node_modules/.bin/* && \
+    npm run build
 
 # =========================
 # Etapa de producción
 # =========================
 FROM nginx:stable-alpine AS production
+WORKDIR /usr/share/nginx/html
 
 # Limpiar contenido por defecto
-RUN rm -rf /usr/share/nginx/html/*
+RUN rm -rf ./*
 
-# Copiar artefactos compilados (incluye .gz y .br generados por Vite)
-COPY --from=build /app/dist /usr/share/nginx/html
+# Copiar artefactos compilados
+COPY --from=build /app/dist ./
 
-# Configuración optimizada para SPA
+# Nginx SPA config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
