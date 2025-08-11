@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { User, Lock, Loader2 } from 'lucide-react';
+import { User, Lock, Loader2, LogIn } from 'lucide-react';
 
 interface LoginPageProps {
   onLoginSuccess: (userData: { employee_id: number; employee_name: string }) => void;
@@ -50,7 +50,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           <div className="space-y-2">
             <Label htmlFor="username">Usuario</Label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <div className="absolute left-0 top-0 bottom-0 flex items-center justify-center w-10 z-10">
+                <User className="h-5 w-5 text-secondary-foreground/90 hover:text-secondary-foreground transition-colors duration-200" />
+              </div>
               <Input
                 id="username"
                 type="text"
@@ -58,14 +60,16 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
-                className="pl-10"
+                className="pl-12 h-12 text-base"
               />
             </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Contraseña</Label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <div className="absolute left-0 top-0 bottom-0 flex items-center justify-center w-10 z-10">
+                <Lock className="h-5 w-5 text-secondary-foreground/90 hover:text-secondary-foreground transition-colors duration-200" />
+              </div>
               <Input
                 id="password"
                 type="password"
@@ -73,7 +77,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="pl-10"
+                className="pl-12 h-12 text-base"
               />
             </div>
           </div>
@@ -85,7 +89,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           <Button
             type="submit"
             disabled={isLoading}
-            className="w-full"
+            className="w-full bg-primary hover:bg-primary/90 transition-colors"
           >
             {isLoading ? (
               <>
@@ -93,7 +97,10 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 Iniciando Sesión...
               </>
             ) : (
-              'Iniciar Sesión'
+              <>
+                <LogIn className="mr-2 h-4 w-4" />
+                Iniciar Sesión
+              </>
             )}
           </Button>
         </form>
