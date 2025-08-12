@@ -196,7 +196,140 @@ export const getDailyActivities = async (
 /* =========================
    Auth (si lo usas)
    ========================= */
+export const submitPermission = async (data: any) => {
+  try {
+    const body = {
+      date: String(data.date ?? ''),
+      employee_id: String(data.employee_id ?? ''),
+      project_code: String(data.project_code ?? ''),
+      phase: String(data.phase ?? ''),
+      discipline: String(data.discipline ?? ''),
+      activity: String(data.activity ?? ''),
+      hours: String(data.hours ?? '0'),
+      note: String(data.note ?? ''),
+      employee: String(data.employee_name ?? '')
+    };
+    
+    console.log('Enviando permiso:', body);
+    const res = await axios.post(`${API_BASE_URL}/permissions/`, body);
+    return res.data;
+  } catch (error: any) {
+    console.error('Error al enviar el permiso:', error);
+    if (axios.isAxiosError(error) && error.response) {
+      console.error('Detalles del error (submitPermission):', error.response.data);
+      const detail = (error.response.data as any)?.detail ?? (error.response.data as any)?.message;
+      if (detail) throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+    }
+    throw error;
+  }
+};
+
 export const loginUser = async (credentials: any) => {
   const res = await axios.post(`${API_BASE_URL}/auth/login`, credentials);
   return res.data;
+};
+
+// =========================
+//    Funciones para permisos
+//    ========================= */
+
+export interface PermissionData {
+  id?: number;
+  date: string;
+  employee_id: string | number;
+  project_code: string;
+  phase: string;
+  discipline: string;
+  activity: string;
+  hours: string | number;
+  note: string;
+  status?: string;
+  response?: string;
+  created_at?: string;
+  updated_at?: string;
+  employee_name?: string;
+}
+
+/**
+ * Obtiene todos los permisos de un empleado
+ */
+export const getEmployeePermissions = async (employeeId: string | number): Promise<PermissionData[]> => {
+  try {
+    const res = await axios.get(`${API_BASE_URL}/permissions/employee/${employeeId}`);
+    return res.data || [];
+  } catch (error: any) {
+    console.error('Error al obtener los permisos del empleado:', error);
+    if (axios.isAxiosError(error) && error.response) {
+      const detail = (error.response.data as any)?.detail || 'Error al obtener los permisos';
+      throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+    }
+    throw error;
+  }
+};
+
+/**
+ * Crea un nuevo permiso
+ */
+export const createPermission = async (data: Omit<PermissionData, 'id'>): Promise<PermissionData> => {
+  try {
+    const res = await axios.post(`${API_BASE_URL}/permissions/`, data);
+    return res.data;
+  } catch (error: any) {
+    console.error('Error al crear el permiso:', error);
+    if (axios.isAxiosError(error) && error.response) {
+      const detail = (error.response.data as any)?.detail || 'Error al crear el permiso';
+      throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+    }
+    throw error;
+  }
+};
+
+/**
+ * Actualiza un permiso existente
+ */
+export const updatePermission = async (permissionId: number, data: Partial<PermissionData>): Promise<PermissionData> => {
+  try {
+    const res = await axios.put(`${API_BASE_URL}/permissions/${permissionId}`, data);
+    return res.data;
+  } catch (error: any) {
+    console.error('Error al actualizar el permiso:', error);
+    if (axios.isAxiosError(error) && error.response) {
+      const detail = (error.response.data as any)?.detail || 'Error al actualizar el permiso';
+      throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+    }
+    throw error;
+  }
+};
+
+/**
+ * Elimina un permiso
+ */
+export const deletePermission = async (permissionId: number): Promise<void> => {
+  try {
+    await axios.delete(`${API_BASE_URL}/permissions/${permissionId}`);
+  } catch (error: any) {
+    console.error('Error al eliminar el permiso:', error);
+    if (axios.isAxiosError(error) && error.response) {
+      const detail = (error.response.data as any)?.detail || 'Error al eliminar el permiso';
+      throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+    }
+    throw error;
+  }
+};
+
+/**
+ * Obtiene un permiso por su ID
+ */
+export const getPermissionById = async (permissionId: number): Promise<PermissionData> => {
+  try {
+    const res = await axios.get(`${API_BASE_URL}/permissions/${permissionId}`);
+    return res.data;
+  } catch (error: any) {
+    console.error('Error al obtener el permiso:', error);
+    if (axios.isAxiosError(error) && error.response) {
+      const detail = (error.response.data as any)?.detail || 'Error al obtener el permiso';
+      throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+    }
+    throw error;
+  }
 };

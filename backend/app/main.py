@@ -1,7 +1,7 @@
 # main.py
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import projects, activities, hours, employees, daily_activities, auth
+from .routers import projects, activities, hours, employees, daily_activities, auth, permissions
 
 app = FastAPI()
 
@@ -30,6 +30,7 @@ app.include_router(projects.router, prefix="/projects", tags=["projects"])
 app.include_router(activities.router, prefix="/activities", tags=["activities"])
 app.include_router(hours.router, prefix="/hours", tags=["hours"])
 app.include_router(employees.router, prefix="/employees", tags=["employees"])
+app.include_router(permissions.router, prefix="/permissions", tags=["permissions"])
 app.include_router(auth.router)
 
 @app.get("/")

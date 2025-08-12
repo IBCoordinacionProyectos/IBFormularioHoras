@@ -47,3 +47,19 @@ class Authentication(Base):
     id_members = Column(Integer, ForeignKey("IB_Members.id"))
     user = Column(String, unique=True, index=True)
     password = Column(String)
+
+class ReportedPermission(Base):
+    __tablename__ = "IB_Reported_permissions"
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date)
+    employee_id = Column(Integer, ForeignKey("IB_Members.id"))
+    project_code = Column(String)
+    phase = Column(String)
+    discipline = Column(String)
+    activity = Column(String)
+    hours = Column(Float)
+    note = Column(String)
+    status = Column(String, default="Pendiente")  # Pendiente, Aprobado, Rechazado
+    response = Column(String, nullable=True)  # Respuesta del aprobador
+    created_at = Column(Date)
+    updated_at = Column(Date)

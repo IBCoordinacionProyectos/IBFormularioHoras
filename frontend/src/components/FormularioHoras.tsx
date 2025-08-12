@@ -4,7 +4,7 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Header from './Header';
 
-import { toast } from 'sonner';
+import { toast, Toaster } from 'sonner';
 import {
   Calendar as CalendarIcon,
   Briefcase,
@@ -23,6 +23,7 @@ import {
   Info,
   Undo2,
   Clock,
+  BarChart2,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -56,6 +57,9 @@ interface FormularioHorasProps {
   employeeId: number;
   employeeName: string;
   onLogout: () => void;
+  onShowPowerBI: () => void;
+  onNavigateToHours: () => void;
+  onNavigateToPermissions: () => void;
 }
 
 interface Project { code: string; name: string }
@@ -89,7 +93,7 @@ const projectComparator = (a: Project, b: Project) => {
   return aCode.localeCompare(bCode, 'es', { numeric: true, sensitivity: 'base' });
 };
 
-const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId, employeeName, onLogout }) => {
+const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId, employeeName, onLogout, onShowPowerBI }) => {
   const [formData, setFormData] = useState(initialFormData(employeeId));
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [dailyActivities, setDailyActivities] = useState<Activity[]>([]);
@@ -477,9 +481,27 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
     return () => window.removeEventListener('keydown', onKey);
   }, [coreSubmit, loading.submit, resetForm]);
 
+  // Navegar a la vista de permisos
+  const handleNavigateToPermissions = () => {
+    // La lógica de navegación se maneja en App.tsx
+  };
+
+  // Navegar a la vista de horas
+  const handleNavigateToHours = () => {
+    // La lógica de navegación se maneja en App.tsx
+  };
+
   return (
-    <div className="min-h-svh overflow-y-auto bg-[#f2f6fd]">
-      <Header userName={employeeName} onLogout={onLogout} />
+    <div className="min-h-screen bg-[#f2f6fd] text-foreground">
+      <Toaster position="top-right" richColors />
+      <Header 
+        employeeName={employeeName} 
+        onLogout={onLogout}
+        onShowPowerBI={onShowPowerBI}
+        onNavigateToHours={handleNavigateToHours}
+        onNavigateToPermissions={handleNavigateToPermissions}
+        currentView="hours"
+      />
 
       <style>{`
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

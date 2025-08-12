@@ -70,6 +70,47 @@ class UserLogin(BaseModel):
     username: str
     password: str
 
+class ReportedPermissionBase(BaseModel):
+    date: date
+    employee_id: int
+    project_code: str
+    phase: str
+    discipline: str
+    activity: str
+    hours: float
+    note: str
+    status: str = "Pendiente"
+    response: Optional[str] = None
+    
+    def model_dump(self, **kwargs):
+        # Asegurarse de que las fechas se conviertan a cadenas ISO
+        data = super().model_dump(**kwargs)
+        if 'date' in data and data['date'] is not None:
+            if hasattr(data['date'], 'isoformat'):
+                data['date'] = data['date'].isoformat()
+        return data
+
+class ReportedPermissionCreate(ReportedPermissionBase):
+    pass
+
+class ReportedPermissionUpdate(BaseModel):
+    date: Optional[date] = None
+    employee_id: Optional[int] = None
+    project_code: Optional[str] = None
+    phase: Optional[str] = None
+    discipline: Optional[str] = None
+    activity: Optional[str] = None
+    hours: Optional[float] = None
+    note: Optional[str] = None
+    status: Optional[str] = None
+    response: Optional[str] = None
+
+class ReportedPermission(ReportedPermissionBase):
+    id: int
+    created_at: date
+    updated_at: Optional[date] = None
+    model_config = ConfigDict(from_attributes=True)
+
 class LoginResponse(BaseModel):
     message: str
     employee_id: int
