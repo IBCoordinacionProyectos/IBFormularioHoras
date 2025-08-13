@@ -1,393 +1,856 @@
-// FormularioPermisos.tsx
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
+// FormularioHoras.tsx
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { toast } from 'sonner';
+import Header from './Header';
+
+import { toast, Toaster } from 'sonner';
 import {
   Calendar as CalendarIcon,
+  Briefcase,
   Save,
+  Pencil,
+  ListChecks,
+  ClipboardList,
   XCircle,
+  PlusCircle,
   Loader2,
-  UserCheck,
+  Folder,
+  Star,
+  ArrowUpDown,
+  Minus,
+  Plus,
+  Info,
+  Undo2,
+  Clock,
+  BarChart2,
 } from 'lucide-react';
-
-import { 
-  createPermission, 
-  updatePermission, 
-  deletePermission, 
-  getEmployeePermissions,
-  type PermissionData 
-} from '../api/horasApi';
 
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
+import { Input } from './ui/input';
 import { Calendar } from './ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { cn } from '../lib/utils';
 
+import { FormSelect } from './formulario/FormSelect';
+import { ActivityItem } from './formulario/ActivityItem';
+import { ActivityListSkeleton } from './formulario/ActivityListSkeleton';
+import { EmptyState } from './formulario/EmptyState';
+import { TotalHoursProgress } from './formulario/TotalHoursProgress';
+
+import {
+  submitHours,
+  getProjects,
+  getProjectStages,
+  getDisciplinesByStage,
+  getActivitiesByDiscipline,
+  getDailyActivities,
+  deleteHour,
+  updateHour,
+  type DailyActivity,
+} from '../api/horasApi';
+
 // Props e interfaces
-interface FormularioPermisosProps {
-  onSuccess?: () => void;
+interface FormularioHorasProps {
+  onSuccess: () => void;
   employeeId: number;
   employeeName: string;
   onLogout: () => void;
-  onShowPowerBI?: () => void;  // Hacer opcional
+  onShowPowerBI: () => void;
   onNavigateToHours: () => void;
   onNavigateToPermissions: () => void;
 }
 
-interface FormData {
-  date: string;
-  employee_id: string;
-  project_code: string;
-  phase: string;
-  discipline: string;
-  activity: string;
-  hours: string;
-  note: string;
-  employee_name?: string;
-  status?: string;
-  response?: string;
-}
+interface Project { code: string; name: string }
 
-const initialFormData = (employeeId: number): FormData => ({
-  date: format(new Date(), 'yyyy-MM-dd'),
+type Activity = DailyActivity;
+
+const initialFormData = (employeeId: number) => ({
   employee_id: String(employeeId),
-  project_code: 'IB-INTERNO',
-  phase: 'PERMISOS',
-  discipline: 'PERMISOS',
-  activity: 'PERMISO_REMUNERADO',
-  hours: '8',
+  project_code: '',
+  phase: '',
+  discipline: '',
+  activity: '',
+  hours: '0',
   note: '',
-  employee_name: '',
 });
 
-const DRAFT_KEY = 'fh_permisos_draft_v1';
+const DRAFT_KEY = 'fh_form_draft_v1';
 
-const FormularioPermisos: React.FC<FormularioPermisosProps> = ({
-  onSuccess,
-  employeeId,
-  employeeName,
-  onLogout,
-  onNavigateToHours,
-  onNavigateToPermissions,
-  onShowPowerBI,
-}) => {
-  const [formData, setFormData] = useState<FormData>(() => initialFormData(employeeId));
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
-  const [editingPermission, setEditingPermission] = useState<PermissionData | null>(null);
-  const navigate = useNavigate();
+// Helper: ordenar A-Z / 0-9
+const sortAZ = (arr: string[]) =>
+  [...arr].sort((a, b) => a.localeCompare(b, 'es', { numeric: true, sensitivity: 'base' }));
 
-  // Manejar clic en el botón de Power BI
-  const handleShowPowerBIClick = useCallback(() => {
-    if (onShowPowerBI) {
-      onShowPowerBI();
-    }
-    navigate('/powerbi');
-  }, [navigate, onShowPowerBI]);
+// Comparator: primero letras, luego números
+const projectComparator = (a: Project, b: Project) => {
+  const aCode = (a.code ?? '').trim();
+  const bCode = (b.code ?? '').trim();
+  const aStartsWithLetter = /^[A-Za-zÁÉÍÓÚÜÑ]/i.test(aCode);
+  const bStartsWithLetter = /^[A-Za-zÁÉÍÓÚÜÑ]/i.test(bCode);
+  if (aStartsWithLetter !== bStartsWithLetter) return aStartsWithLetter ? -1 : 1;
+  // dentro del mismo grupo, ordenar natural A-Z/0-9
+  return aCode.localeCompare(bCode, 'es', { numeric: true, sensitivity: 'base' });
+};
 
-  // Cargar borrador guardado
-  useEffect(() => {
-    const savedDraft = localStorage.getItem(DRAFT_KEY);
-    if (savedDraft) {
-      try {
-        const parsedDraft = JSON.parse(savedDraft);
-        setFormData(prev => ({
-          ...initialFormData(employeeId),
-          ...parsedDraft,
-          employee_id: String(employeeId)
-        }));
-      } catch (e) {
-        console.error('Error al cargar el borrador:', e);
-      }
-    }
-  }, [employeeId]);
+const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId, employeeName, onLogout, onShowPowerBI }) => {
+  const [formData, setFormData] = useState(initialFormData(employeeId));
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [dailyActivities, setDailyActivities] = useState<Activity[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [stages, setStages] = useState<string[]>([]);
+  const [disciplines, setDisciplines] = useState<string[]>([]);
+  const [activities, setActivities] = useState<string[]>([]);
+  const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
 
-  // Guardar borrador cuando cambia el formulario
-  useEffect(() => {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
-  }, [formData]);
+  type Favorite = { project_code: string; phase: string; discipline: string; activity: string };
+  const FAV_KEY = useMemo(() => `fh_favorites_v1_${employeeId}`, [employeeId]);
+  const [favorites, setFavorites] = useState<Favorite[]>([]);
 
-  const handleDateChange = (date: Date | undefined) => {
-    if (date) setSelectedDate(date);
-  };
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [isDirty, setIsDirty] = useState<boolean>(false);
+  const [loading, setLoading] = useState({
+    submit: false,
+    projects: true,
+    stages: false,
+    disciplines: false,
+    activities: false,
+    dailyActivities: true,
+    delete: null as string | null,
+  });
 
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-
-    // Validación en tiempo real
-    if (name === 'note') {
-      setErrors(prev => ({
-        ...prev,
-        note: value.trim().length < 5 ? 'Por favor proporciona más detalles' : ''
-      }));
-    } else if (name === 'activity') {
-      setErrors(prev => ({
-        ...prev,
-        activity: !value ? 'Selecciona un tipo de permiso' : ''
-      }));
-    }
-  };
-
-  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Limpiar error al seleccionar una opción
-    if (name === 'activity') {
-      setErrors(prev => ({
-        ...prev,
-        activity: ''
-      }));
-    }
-  };
-
-  const handleNoteKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+  const hoursInputRef = useRef<HTMLInputElement | null>(null);
+  const undoTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const favScrollRef = useRef<HTMLDivElement | null>(null);
+  const handleFavWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
       e.preventDefault();
+      e.stopPropagation();
+      e.currentTarget.scrollLeft += e.deltaY;
+    }
+  }, []);
+
+  const selectedProjectName = useMemo(
+    () => projects.find(p => p.code === formData.project_code)?.name || '',
+    [formData.project_code, projects]
+  );
+  const hoursNumber = useMemo(() => {
+    const raw = String(formData.hours ?? '').replace(',', '.').trim();
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : 0;
+  }, [formData.hours]);
+  const totalHoursToday = useMemo(
+    () => dailyActivities.reduce((sum, a) => sum + (Number(a.hours) || 0), 0),
+    [dailyActivities]
+  );
+
+  const [errors, setErrors] = useState<Partial<Record<keyof ReturnType<typeof initialFormData>, string>>>({});
+  useEffect(() => {
+    const newErrors: typeof errors = {};
+    if (!formData.project_code) newErrors.project_code = 'Selecciona un proyecto';
+    if (!formData.phase) newErrors.phase = 'Selecciona una etapa';
+    if (!formData.discipline) newErrors.discipline = 'Selecciona una disciplina';
+    if (!formData.activity) newErrors.activity = 'Selecciona una actividad';
+    if (!(hoursNumber > 0)) newErrors.hours = 'Ingresa horas válidas (> 0)';
+    setErrors(newErrors);
+  }, [formData, hoursNumber]);
+
+  useEffect(() => {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (raw) { try {
+      const draft = JSON.parse(raw);
+      setFormData((prev) => ({ ...prev, ...draft, employee_id: String(employeeId) }));
+    } catch {} }
+  }, [employeeId]);
+  useEffect(() => { localStorage.setItem(DRAFT_KEY, JSON.stringify(formData)); }, [formData]);
+
+  useEffect(() => {
+    const raw = localStorage.getItem(FAV_KEY);
+    if (raw) try { setFavorites(JSON.parse(raw)); } catch {}
+  }, [FAV_KEY]);
+  const saveFavorites = (next: Favorite[]) => { setFavorites(next); localStorage.setItem(FAV_KEY, JSON.stringify(next)); };
+
+  const currentFavObj = useMemo(() => {
+    if (!formData.project_code || !formData.phase || !formData.discipline || !formData.activity) return null;
+    return { project_code: formData.project_code, phase: formData.phase, discipline: formData.discipline, activity: formData.activity } as Favorite;
+  }, [formData.project_code, formData.phase, formData.discipline, formData.activity]);
+  const isCurrentFavorite = useMemo(() => {
+    if (!currentFavObj) return false;
+    return favorites.some(f => JSON.stringify(f) === JSON.stringify(currentFavObj));
+  }, [favorites, currentFavObj]);
+
+  const toggleFavorite = () => {
+    if (!currentFavObj) { toast.error('Completa Proyecto, Etapa, Disciplina y Actividad para usar favoritos'); return; }
+    if (isCurrentFavorite) {
+      const next = favorites.filter(f => JSON.stringify(f) !== JSON.stringify(currentFavObj));
+      saveFavorites(next);
+      toast.message('Eliminado de favoritos');
+    } else {
+      saveFavorites([...favorites, currentFavObj]);
+      toast.success('Guardado en favoritos');
+    }
+  };
+
+  const visibleActivities = useMemo(() => {
+    let list = [...dailyActivities];
+    list.sort((a, b) => (a.id || '').localeCompare(b.id || ''));
+    if (sortDir === 'desc') list.reverse();
+    return list;
+  }, [dailyActivities, sortDir]);
+
+  useEffect(() => {
+    const base = initialFormData(employeeId);
+    const changed = JSON.stringify({ ...formData, employee_id: undefined }) !== JSON.stringify({ ...base, employee_id: undefined });
+    setIsDirty(changed || Boolean(editingActivityId));
+  }, [formData, editingActivityId, employeeId]);
+
+  const refreshDailyActivities = useCallback(async (date: Date, id: string) => {
+    setLoading((p) => ({ ...p, dailyActivities: true }));
+    try {
+      const dateString = format(date, 'yyyy-MM-dd');
+      const acts = await getDailyActivities(dateString, Number(id));
+      setDailyActivities(acts);
+    } catch (e) {
+      toast.error('Error al cargar las actividades del día.');
+      console.error(e);
+    } finally {
+      setLoading((p) => ({ ...p, dailyActivities: false }));
+    }
+  }, []);
+
+  const fetchProjects = useCallback(async () => {
+    setLoading((p) => ({ ...p, projects: true }));
+    try {
+      const data = await getProjects();
+      const sorted = [...data].sort(projectComparator); // letras primero, luego números
+      setProjects(sorted);
+    } catch (e) {
+      toast.error('Error al cargar proyectos.');
+    } finally {
+      setLoading((p) => ({ ...p, projects: false }));
+    }
+  }, []);
+
+  const fetchStages = useCallback(async (projectCode: string) => {
+    if (!projectCode) return [] as string[];
+    setLoading((p) => ({ ...p, stages: true }));
+    try {
+      const data = await getProjectStages(projectCode);
+      const cleaned = (data || []).filter((v: any) => v != null && String(v).trim() !== '').map(String);
+      const sorted = sortAZ(cleaned);
+      setStages(sorted);
+      return sorted;
+    } catch (e) {
+      toast.error('Error al cargar etapas.');
+      setStages([]);
+      return [];
+    } finally {
+      setLoading((p) => ({ ...p, stages: false }));
+    }
+  }, []);
+
+  const fetchDisciplines = useCallback(async (projectCode: string, stage: string) => {
+    if (!projectCode || !stage) return [] as string[];
+    setLoading((p) => ({ ...p, disciplines: true }));
+    try {
+      const data = await getDisciplinesByStage(projectCode, stage);
+      const cleaned = (data || []).filter((v: any) => v != null && String(v).trim() !== '').map(String);
+      const sorted = sortAZ(cleaned);
+      setDisciplines(sorted);
+      return sorted;
+    } catch (e) {
+      toast.error('Error al cargar disciplinas.');
+      setDisciplines([]);
+      return [];
+    } finally {
+      setLoading((p) => ({ ...p, disciplines: false }));
+    }
+  }, []);
+
+  const fetchActivities = useCallback(async (projectCode: string, stage: string, discipline: string) => {
+    if (!projectCode || !stage || !discipline) return [] as string[];
+    setLoading((p) => ({ ...p, activities: true }));
+    try {
+      const data = await getActivitiesByDiscipline(projectCode, stage, discipline);
+      const cleaned = (data || []).filter((v: any) => v != null && String(v).trim() !== '').map(String);
+      const sorted = sortAZ(cleaned);
+      setActivities(sorted);
+      return sorted;
+    } catch (e) {
+      toast.error('Error al cargar actividades.');
+      setActivities([]);
+      return [];
+    } finally {
+      setLoading((p) => ({ ...p, activities: false }));
+    }
+  }, []);
+
+  const applyFavorite = useCallback(async (fav: Favorite) => {
+    try {
+      setFormData((prev) => ({ ...prev, project_code: fav.project_code, phase: '', discipline: '', activity: '' }));
+      const st = await fetchStages(fav.project_code);
+      if (st && st.includes(fav.phase)) {
+        const ds = await fetchDisciplines(fav.project_code, fav.phase);
+        if (ds && ds.includes(fav.discipline)) {
+          const ac = await fetchActivities(fav.project_code, fav.phase, fav.discipline);
+          if (ac && ac.includes(fav.activity)) {
+            setFormData({
+              employee_id: String(employeeId),
+              project_code: fav.project_code,
+              phase: fav.phase,
+              discipline: fav.discipline,
+              activity: fav.activity,
+              hours: '0',
+              note: '',
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error('No se pudo aplicar el favorito');
+    }
+  }, [employeeId, fetchStages, fetchDisciplines, fetchActivities]);
+
+  useEffect(() => { fetchProjects(); }, [fetchProjects]);
+  useEffect(() => { refreshDailyActivities(selectedDate, String(employeeId)); }, [selectedDate, employeeId, refreshDailyActivities]);
+
+  const handleDateChange = (date?: Date) => { if (date) setSelectedDate(date); };
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    const v = name === 'hours' ? value.replace(',', '.') : value;
+    setFormData((prev) => ({ ...prev, [name]: v }));
+  };
+  const handleNoteKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => { if (e.key === 'Enter' && !e.shiftKey) e.preventDefault(); };
+
+  const handleSelectChange = async (name: keyof ReturnType<typeof initialFormData>, value: string) => {
+    const updated = { ...formData, [name]: value } as ReturnType<typeof initialFormData>;
+    switch (name) {
+      case 'project_code':
+        updated.phase = ''; updated.discipline = ''; updated.activity = '';
+        setFormData(updated); setStages([]); setDisciplines([]); setActivities([]);
+        if (value) await fetchStages(value);
+        break;
+      case 'phase':
+        updated.discipline = ''; updated.activity = '';
+        setFormData(updated); setDisciplines([]); setActivities([]);
+        if (value && updated.project_code) await fetchDisciplines(updated.project_code, value);
+        break;
+      case 'discipline':
+        updated.activity = '';
+        setFormData(updated); setActivities([]);
+        if (value && updated.project_code && updated.phase) await fetchActivities(updated.project_code, updated.phase, value);
+        break;
+      default:
+        setFormData(updated);
     }
   };
 
   const resetForm = useCallback(() => {
     setFormData(initialFormData(employeeId));
-    setErrors({});
+    setEditingActivityId(null);
   }, [employeeId]);
 
-  const handleSubmitPermission = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validación final
-    const newErrors: Partial<Record<keyof FormData, string>> = {};
-    if (!formData.activity) newErrors.activity = 'Selecciona un tipo de permiso';
-    if (!formData.note || formData.note.trim().length < 5) {
-      newErrors.note = 'Por favor proporciona más detalles sobre el motivo del permiso';
-    }
-
-    setErrors(newErrors);
-    if (Object.keys(newErrors).length > 0) {
-      toast.error('Por favor corrige los errores en el formulario');
-      return;
-    }
-
+  const handleEditActivity = useCallback(async (activity: Activity) => {
     try {
-      setIsSubmitting(true);
-
-      const submissionData = {
-        ...formData,
-        date: format(selectedDate, 'yyyy-MM-dd'),
-        employee_id: String(employeeId),
-        employee_name: employeeName,
-        hours: '8', // Día completo de permiso
-        project_code: 'IB-INTERNO',
-        phase: 'PERMISOS',
-        discipline: 'PERMISOS',
-      };
-
-      if (editingPermission?.id) {
-        // Actualizar permiso existente
-        const permissionId = Number(editingPermission.id);
-        if (isNaN(permissionId)) {
-          throw new Error('ID de permiso no válido para actualizar');
-        }
-        await updatePermission(permissionId, submissionData);
-        toast.success('Permiso actualizado exitosamente');
-      } else {
-        // Crear nuevo permiso
-        await createPermission(submissionData);
-        toast.success('Solicitud de permiso enviada exitosamente');
+      if (activity.date) {
+        try {
+          const d = typeof activity.date === 'string' ? parseISO(activity.date) : new Date(activity.date);
+          setSelectedDate(d);
+        } catch {}
       }
+      if (activity.project_code) {
+        await fetchStages(activity.project_code);
+        if (activity.phase) await fetchDisciplines(activity.project_code, activity.phase);
+        if (activity.phase && activity.discipline) await fetchActivities(activity.project_code, activity.phase, activity.discipline);
+      }
+      setFormData({
+        employee_id: String(employeeId),
+        project_code: activity.project_code || '',
+        phase: activity.phase || '',
+        discipline: activity.discipline || '',
+        activity: activity.activity || '',
+        hours: String(activity.hours ?? '0'),
+        note: activity.note || '',
+      });
+      setEditingActivityId(String(activity.id));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (e) {
+      console.error(e);
+      toast.error('Error al cargar la actividad para edición');
+    }
+  }, [employeeId, fetchStages, fetchDisciplines, fetchActivities]);
 
-      resetForm();
-      onSuccess?.();
-    } catch (error: any) {
-      console.error('Error al procesar la solicitud de permiso:', error);
-      toast.error(error.message || 'Error al procesar la solicitud de permiso');
-    } finally {
-      setIsSubmitting(false);
+  const [undoData, setUndoData] = useState<Activity | null>(null);
+  const triggerUndoBanner = (activity: Activity) => {
+    setUndoData(activity);
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = setTimeout(() => setUndoData(null), 8000);
+  };
+  const handleUndoDelete = async () => {
+    if (!undoData) return;
+    const a = undoData; setUndoData(null);
+    try {
+      await submitHours({
+        project_code: a.project_code,
+        phase: a.phase,
+        discipline: a.discipline,
+        activity: a.activity,
+        hours: a.hours,
+        note: a.note || '',
+        date: format(selectedDate, 'yyyy-MM-dd'),
+        employee_id: employeeId,
+      });
+      await refreshDailyActivities(selectedDate, String(employeeId));
+      toast.success('Registro restaurado');
+    } catch (e) {
+      toast.error('No se pudo restaurar');
     }
   };
 
-  // Función para cargar un permiso para edición
-  const loadPermissionForEdit = (permission: PermissionData) => {
-    // Verificar que el permiso tenga un ID numérico válido
-    const permissionId = permission.id ? Number(permission.id) : NaN;
-    if (isNaN(permissionId)) {
-      console.error('No se puede editar un permiso sin un ID válido');
-      return;
-    }
-    
-    setEditingPermission({
-      ...permission,
-      id: permissionId // Asegurar que el ID sea un número
-    });
-    
-    setFormData({
-      date: permission.date || format(new Date(), 'yyyy-MM-dd'),
-      employee_id: String(permission.employee_id),
-      project_code: permission.project_code || 'IB-INTERNO',
-      phase: permission.phase || 'PERMISOS',
-      discipline: permission.discipline || 'PERMISOS',
-      activity: permission.activity || '',
-      hours: String(permission.hours || '8'),
-      note: permission.note || '',
-      employee_name: permission.employee_name || '',
-      status: permission.status,
-      response: permission.response
-    });
-    
-    if (permission.date) {
-      setSelectedDate(new Date(permission.date));
-    } else {
-      setSelectedDate(new Date());
-    }
-  };
+  const coreSubmit = async () => {
+    const submissionData = {
+      project_code: formData.project_code,
+      phase: formData.phase,
+      discipline: formData.discipline,
+      activity: formData.activity,
+      hours: hoursNumber,
+      note: formData.note || '',
+      date: format(selectedDate, 'yyyy-MM-dd'),
+      employee_id: employeeId,
+    };
 
-  // Función para eliminar un permiso
-  const handleDeletePermission = async (permissionId: number) => {
-    if (!permissionId) {
-      console.error('No se puede eliminar un permiso sin ID');
-      return;
-    }
-    if (!confirm('¿Estás seguro de que deseas eliminar este permiso?')) {
-      return;
-    }
+    const toastId = toast.loading(editingActivityId ? 'Actualizando actividad...' : 'Guardando actividad...');
+    setLoading((p) => ({ ...p, submit: true }));
 
     try {
-      setIsSubmitting(true);
-      await deletePermission(permissionId);
-      toast.success('Permiso eliminado exitosamente');
+      if (editingActivityId) { await updateHour(editingActivityId, submissionData); }
+      else { await submitHours(submissionData); }
+
+      toast.success(`Actividad ${editingActivityId ? 'actualizada' : 'guardada'} con éxito.`, { id: toastId, duration: 1800 });
+      await refreshDailyActivities(selectedDate, String(employeeId));
       onSuccess?.();
-    } catch (error: any) {
-      console.error('Error al eliminar el permiso:', error);
-      toast.error(error.message || 'Error al eliminar el permiso');
+      return true;
+    } catch (e) {
+      console.error(e);
+      toast.error('Ocurrió un error al guardar.', { id: toastId });
+      return false;
     } finally {
-      setIsSubmitting(false);
+      setLoading((p) => ({ ...p, submit: false }));
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (Object.keys(errors).length) { toast.error('Revisa los campos marcados'); return; }
+    const ok = await coreSubmit();
+    if (ok) resetForm();
+  };
+
+  const handleDelete = async (id: string) => {
+    const prev = dailyActivities.find(a => String(a.id) === String(id));
+    try {
+      setLoading(p => ({ ...p, delete: id }));
+      await deleteHour(id);
+      await refreshDailyActivities(selectedDate, String(employeeId));
+      if (prev) triggerUndoBanner(prev);
+      toast.error('Actividad eliminada');
+    } catch (e) {
+      console.error(e);
+      toast.error('No se pudo eliminar');
+    } finally {
+      setLoading(p => ({ ...p, delete: null }));
+    }
+  };
+
+  const adjustHours = (delta: number) => {
+    const current = hoursNumber || 0;
+    const next = Math.max(0, Math.round((current + delta) * 2) / 2);
+    setFormData((prev) => ({ ...prev, hours: String(next) }));
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'enter') {
+        e.preventDefault();
+        (async () => { if (!loading.submit) { const ok = await coreSubmit(); if (ok) resetForm(); } })();
+      }
+      if (e.key === 'Escape') { resetForm(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [coreSubmit, loading.submit, resetForm]);
+
+  // Navegar a la vista de permisos
+  const handleNavigateToPermissions = () => {
+    // La lógica de navegación se maneja en App.tsx
+  };
+
+  // Navegar a la vista de horas
+  const handleNavigateToHours = () => {
+    // La lógica de navegación se maneja en App.tsx
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-3xl mx-auto">
-          <Card className="mb-8">
-            <CardHeader className="bg-blue-600 text-white rounded-t-lg">
-              <CardTitle className="flex items-center gap-2">
-                <UserCheck className="h-6 w-6" />
-                Solicitud de Permiso
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <form onSubmit={handleSubmitPermission} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Fecha del Permiso</label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            'w-full justify-start text-left font-normal',
-                            !selectedDate && 'text-muted-foreground'
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {selectedDate ? (
-                            format(selectedDate, 'PPP', { locale: es })
-                          ) : (
-                            <span>Selecciona una fecha</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={selectedDate}
-                          onSelect={handleDateChange}
-                          initialFocus
-                          locale={es}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+    <div className="min-h-screen bg-[#f2f6fd] text-foreground">
+      <Toaster position="top-right" richColors />
+      <Header 
+        employeeName={employeeName} 
+        onLogout={onLogout}
+        onShowPowerBI={onShowPowerBI}
+        onNavigateToHours={handleNavigateToHours}
+        onNavigateToPermissions={handleNavigateToPermissions}
+        currentView="hours"
+      />
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Tipo de Permiso</label>
-                    <select
-                      name="activity"
-                      value={formData.activity}
-                      onChange={handleSelectChange}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <option value="">Selecciona un tipo de permiso</option>
-                      <option value="PERMISO_REMUNERADO">Permiso Remunerado</option>
-                      <option value="PERMISO_NO_REMUNERADO">Permiso No Remunerado</option>
-                      <option value="PERMISO_MEDICO">Permiso Médico</option>
-                      <option value="OTRO">Otro</option>
-                    </select>
-                    {errors.activity && (
-                      <p className="text-sm text-red-500 mt-1">{errors.activity}</p>
-                    )}
-                  </div>
+      <style>{`
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .fav-strip { overscroll-behavior-y: contain; touch-action: pan-x; }
+
+        /* 👉 Fuerza saltos de línea en textos sin espacios y evita desbordes */
+        .text-wrap, .text-wrap *{
+          overflow-wrap: anywhere;
+          word-break: break-word;
+          hyphens: auto;
+        }
+      `}</style>
+
+      <div className="mx-auto container p-4 sm:p-6 lg:p-8">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+          {/* PRINCIPAL */}
+          <main className={cn('lg:col-span-3')}>
+            <Card className="relative z-10 flex flex-col text-wrap">
+              <CardHeader className="relative items-center text-center">
+                <div className="flex items-center justify-center gap-2">
+                  {editingActivityId ? <Pencil className="h-5 w-5" /> : <PlusCircle className="h-5 w-5" />}
+                  <CardTitle className="text-center">
+                    {editingActivityId ? 'Editar Actividad' : 'Registrar Actividad'}
+                  </CardTitle>
                 </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    Motivo del Permiso <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    placeholder="Describe el motivo del permiso (mínimo 5 caracteres)"
-                    name="note"
-                    value={formData.note}
-                    onChange={handleChange}
-                    onKeyDown={handleNoteKeyDown}
-                    rows={4}
-                  />
-                  {errors.note && (
-                    <p className="text-sm text-red-500 mt-1">{errors.note}</p>
+                <div className="absolute right-4 top-4 text-xs">
+                  {editingActivityId ? (
+                    <span className="px-2 py-1 rounded-full bg-amber-100 text-amber-800">Editando</span>
+                  ) : (
+                    <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">Creando</span>
                   )}
                 </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Registra tus horas del día para el proyecto seleccionado.
+                </p>
 
-                <div className="flex justify-end space-x-4 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={resetForm}
-                    disabled={isSubmitting}
-                    className="flex items-center"
-                  >
-                    <XCircle className="mr-2 h-4 w-4" />
-                    Cancelar
-                  </Button>
+                <div className="mt-3 text-xs sm:text-sm text-foreground/80 flex flex-wrap justify-center gap-2">
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white border">
+                    <Briefcase className="h-3.5 w-3.5" /> {formData.project_code || '—'}
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white border">
+                    <ListChecks className="h-3.5 w-3.5" /> {formData.phase || '—'}
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white border">
+                    <Pencil className="h-3.5 w-3.5" /> {formData.discipline || '—'}
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white border">
+                    <ClipboardList className="h-3.5 w-3.5" /> {formData.activity || '—'}
+                  </span>
+                </div>
+              </CardHeader>
+
+              <CardContent>
+                {/* Fecha */}
+                <div className="mb-4 w-full sm:max-w-xs">
+                  <label className="block text-sm font-medium text-foreground/80 mb-1">
+                    <span className="inline-flex items-center gap-1">
+                      <CalendarIcon className="h-4 w-4" /> Fecha
+                    </span>
+                  </label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className={cn('w-full justify-start font-normal h-10', !selectedDate && 'text-muted-foreground')}>
+                        <span>{format(selectedDate, 'PPP', { locale: es })}</span>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar mode="single" selected={selectedDate} onSelect={handleDateChange} initialFocus locale={es} />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* GRID: columna izquierda más estrecha */}
+                <div className="grid grid-cols-1 md:grid-cols-[320px_minmax(0,1fr)] gap-6 items-start">
+                  {/* Código de Proyecto (col izq) */}
+                  <div className="text-wrap">
+                    <FormSelect
+                      label="Código de Proyecto"
+                      name="project_code"
+                      value={formData.project_code}
+                      onValueChange={handleSelectChange as any}
+                      options={projects.map((p) => ({ value: p.code, label: p.code, dropdownLabel: `${p.code} - ${p.name}` }))}
+                      placeholder="Seleccione un proyecto"
+                      loading={loading.projects}
+                      disabled={loading.projects}
+                      icon={<Briefcase className="h-4 w-4" />}
+                      required
+                    />
+                    <p className="mt-1 text-[12px] text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis leading-none">
+                      Elige el proyecto para cargar los demas campos.
+                    </p>
+                  </div>
+
+                  {/* Nombre del Proyecto (col der) */}
+                  <div className="space-y-2 text-wrap">
+                    <label className="block text-sm font-medium text-foreground/80 mb-1">
+                      <span className="inline-flex items-center gap-1"><Folder className="h-4 w-4" /> Nombre del Proyecto</span>
+                    </label>
+                    <Input value={selectedProjectName} readOnly className="bg-muted/50" aria-label="Nombre de proyecto seleccionado" />
+                  </div>
+
+                  {/* Etapa (izq) */}
+                  <div className="text-wrap">
+                    <FormSelect
+                      label="Etapa"
+                      name="phase"
+                      value={formData.phase}
+                      onValueChange={handleSelectChange as any}
+                      options={stages.map((s) => ({ value: s, label: s }))}
+                      placeholder="Seleccione una etapa"
+                      loading={loading.stages}
+                      disabled={!formData.project_code || loading.stages}
+                      icon={<ListChecks className="h-4 w-4" />}
+                      required
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">Etapas disponibles para el proyecto elegido.</p>
+                  </div>
+
+                  {/* Disciplina (der) */}
+                  <div className="text-wrap">
+                    <FormSelect
+                      label="Disciplina"
+                      name="discipline"
+                      value={formData.discipline}
+                      onValueChange={handleSelectChange as any}
+                      options={disciplines.map((d) => ({ value: d, label: d }))}
+                      placeholder="Seleccione una disciplina"
+                      loading={loading.disciplines}
+                      disabled={!formData.phase || loading.disciplines}
+                      icon={<Pencil className="h-4 w-4" />}
+                      required
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">Se filtran según la etapa seleccionada.</p>
+                  </div>
+
+                  {/* Actividad (izq) */}
+                  <div className="w-full md:w-[320px] text-wrap">
+                    <FormSelect
+                      label="Actividad"
+                      name="activity"
+                      value={formData.activity}
+                      onValueChange={handleSelectChange as any}
+                      options={activities.map((a) => ({ value: a, label: a }))}
+                      placeholder="Seleccione una actividad"
+                      loading={loading.activities}
+                      disabled={!formData.discipline || loading.activities}
+                      icon={<ClipboardList className="h-4 w-4" />}
+                      required
+                    />
+                  </div>
+
+                  {/* Horas (der) – input a la izquierda, botones a la derecha */}
+                  <div className="flex flex-col text-wrap">
+                    <label htmlFor="hours" className="block text-sm font-medium text-foreground/80 mb-1">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="h-4 w-4" /> Horas <span className="text-destructive">*</span>
+                      </span>
+                    </label>
+
+                    <div className="flex items-center gap-1">
+                      {/* Botón Restar */}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 shrink-0"
+                        onClick={() => adjustHours(-0.5)}
+                        aria-label="Restar 0.5h"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+
+                      {/* Botón Sumar */}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 shrink-0"
+                        onClick={() => adjustHours(0.5)}
+                        aria-label="Sumar 0.5h"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+
+                      {/* Input de horas */}
+                      <Input
+                        id="hours"
+                        name="hours"
+                        type="number"
+                        value={formData.hours}
+                        onChange={handleChange}
+                        min="0"
+                        step="0.5"
+                        ref={hoursInputRef}
+                        className="h-10 w-[100px] shrink-0 rounded-md mr-0"
+                      />
+
+                      {/* Botón Favorito */}
+                      <Button
+                        type="button"
+                        variant={isCurrentFavorite ? 'default' : 'outline'}
+                        className="h-10 shrink-0"
+                        onClick={toggleFavorite}
+                        title={isCurrentFavorite ? 'Quitar de favoritos' : 'Guardar como favorito'}
+                      >
+                        <Star className="h-4 w-4 mr-2" /> Favorito
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Chips de favoritos (ocupa ambas columnas) */}
+                  {favorites.length > 0 && (
+                    <div className="md:col-span-2">
+                      <div
+                        ref={favScrollRef}
+                        onWheel={handleFavWheel}
+                        className="mt-1 overflow-x-auto whitespace-nowrap hide-scrollbar fav-strip"
+                        style={{ overscrollBehaviorX: 'contain', overscrollBehaviorY: 'none', touchAction: 'pan-x' }}
+                      >
+                        <div className="flex gap-2">
+                          {favorites.map((fav, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => applyFavorite(fav)}
+                              className="inline-flex items-center gap-2 px-3 py-1 rounded-full border bg-white hover:bg-muted text-xs shrink-0"
+                              title={`${fav.project_code} • ${fav.phase} • ${fav.discipline}`}
+                            >
+                              <Star className="h-3.5 w-3.5" />
+                              <span className="font-medium">{fav.activity}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Nota (Opcional) – 2 líneas */}
+                  <div className="md:col-span-2 w-full text-wrap">
+                    <label htmlFor="note" className="block text-sm font-medium text-foreground/80 mb-1">
+                      <span className="inline-flex items-center gap-1">
+                        <Info className="h-4 w-4" /> Nota (Opcional)
+                      </span>
+                    </label>
+                    <textarea
+                      id="note"
+                      name="note"
+                      value={formData.note}
+                      onChange={handleChange}
+                      onKeyDown={handleNoteKeyDown}
+                      rows={2}
+                      className="flex h-19 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 whitespace-pre-wrap"
+                      placeholder="Descripción breve del trabajo realizado"
+                    />
+                  </div>
+                </div>
+
+                {/* Acciones */}
+                <div className="mt-6 flex items-center justify-end gap-3">
                   <Button
                     type="submit"
-                    disabled={isSubmitting || Object.keys(errors).length > 0}
-                    className="flex items-center bg-blue-600 hover:bg-blue-700"
+                    onClick={(e) => { e.preventDefault(); handleSubmit(e as any); }}
+                    disabled={loading.submit || Object.keys(errors).length > 0}
+                    className="h-11"
                   >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Enviando...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
-                        Enviar Solicitud
-                      </>
-                    )}
+                    {loading.submit ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    {editingActivityId ? 'Actualizar' : 'Guardar'}
                   </Button>
+
+                  {editingActivityId && (
+                    <Button type="button" variant="outline" onClick={resetForm} className="h-11">
+                      <XCircle className="mr-2 h-4 w-4" /> Cancelar edición
+                    </Button>
+                  )}
                 </div>
-              </form>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </main>
+
+          {/* LATERAL */}
+          <aside className="lg:col-span-2">
+            <Card className="h-full text-wrap">
+              <CardHeader className="relative">
+                <CardTitle className="text-center flex items-center justify-center gap-2">
+                  <ClipboardList className="h-5 w-5" />
+                  Actividades del Día
+                </CardTitle>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  title="Ordenar"
+                  onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                  className="absolute right-4 top-4"
+                >
+                  <ArrowUpDown className="h-4 w-4" />
+                </Button>
+
+                <div className="text-sm text-muted-foreground flex items-center justify-center gap-3 mt-2">
+                  <span className="inline-flex items-center gap-2">
+                    <CalendarIcon className="h-4 w-4" /> {format(selectedDate, 'PPP', { locale: es })}
+                  </span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-muted/60 text-foreground/80">
+                    Total registros: {dailyActivities.length}
+                  </span>
+                </div>
+              </CardHeader>
+
+              <CardContent>
+                {loading.dailyActivities ? (
+                  <ActivityListSkeleton />
+                ) : visibleActivities.length > 0 ? (
+                  <>
+                    {/* Lista sin overflow horizontal y con saltos de línea */}
+                    <div className="space-y-4 max-h-[520px] overflow-y-auto overflow-x-hidden pr-1 text-wrap">
+                      {visibleActivities.map((activity) => (
+                        <div key={activity.id} className="text-wrap">
+                          <ActivityItem
+                            activity={activity}
+                            onEdit={handleEditActivity}
+                            onDelete={handleDelete}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="pt-3">
+                      <TotalHoursProgress totalHours={totalHoursToday} selectedDate={selectedDate} />
+                    </div>
+                  </>
+                ) : (
+                  <EmptyState />
+                )}
+              </CardContent>
+            </Card>
+          </aside>
         </div>
       </div>
+
+      {undoData && (
+        <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 bg-red-50 border border-red-200 text-red-700 shadow rounded-full px-4 py-2 flex items-center gap-3">
+          <span className="text-sm">Registro eliminado.</span>
+          <Button size="sm" variant="outline" onClick={handleUndoDelete}>
+            <Undo2 className="h-4 w-4 mr-1" /> Deshacer
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
 
-export default FormularioPermisos;
+export default FormularioHoras;

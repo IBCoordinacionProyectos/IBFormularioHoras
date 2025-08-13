@@ -24,15 +24,8 @@ def create_reported_permission(permission: schemas.ReportedPermissionCreate) -> 
         ValueError: Si hay un error al crear el permiso
     """
     try:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc).date()
         permission_data = permission.model_dump()
-        
-        # Convertir fechas a cadenas ISO
-        if 'date' in permission_data and permission_data['date'] is not None:
-            if isinstance(permission_data['date'], (date, datetime)):
-                permission_data['date'] = permission_data['date'].isoformat()
-                
-        # Agregar marcas de tiempo
         permission_data['created_at'] = now.isoformat()
         permission_data['updated_at'] = now.isoformat()
         
@@ -40,7 +33,6 @@ def create_reported_permission(permission: schemas.ReportedPermissionCreate) -> 
         if 'status' not in permission_data or not permission_data['status']:
             permission_data['status'] = 'Pendiente'
             
-        logger.debug(f"Intentando insertar permiso con datos: {permission_data}")
         response = supabase.table("IB_Reported_permissions").insert(permission_data).execute()
         
         if not response.data:

@@ -39,25 +39,10 @@ async def create_permission(
     - **response**: Respuesta del aprobador (opcional)
     """
     try:
-        # Convertir la fecha a objeto date si es necesario
-        permission_data = permission.model_dump()
-        if 'date' in permission_data and isinstance(permission_data['date'], str):
-            try:
-                permission_data['date'] = date.fromisoformat(permission_data['date'])
-            except (ValueError, TypeError) as e:
-                raise ValueError(f"Formato de fecha inválido: {permission_data['date']}. Use YYYY-MM-DD")
-                
-        # Crear el permiso
-        created_permission = crud_permissions.create_reported_permission(
-            schemas.ReportedPermissionCreate(**permission_data)
-        )
-        return created_permission
-        
+        return crud_permissions.create_reported_permission(permission)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error al crear el permiso: {str(e)}")
 
 @router.put(

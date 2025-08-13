@@ -1,12 +1,12 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { Button } from './ui/button';
 import { LogOut, Bell, BarChart2, Clock, FileClock } from 'lucide-react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 export interface HeaderProps {
   employeeName?: string;
   onLogout: () => void;
-  onShowPowerBI?: () => void;  // Hacer opcional
+  onShowPowerBI: () => void;
   onNavigateToHours: () => void;
   onNavigateToPermissions: () => void;
   currentView?: 'hours' | 'permissions';
@@ -21,16 +21,7 @@ const Header: React.FC<HeaderProps> = ({
   currentView = 'hours'
 }) => {
   const location = useLocation();
-  const navigate = useNavigate();
   const isActive = (path: string) => location.pathname === path;
-  
-  // Manejar clic en el botón de Power BI
-  const handleShowPowerBIClick = useCallback(() => {
-    if (onShowPowerBI) {
-      onShowPowerBI();
-    }
-    navigate('/powerbi');
-  }, [navigate, onShowPowerBI]);
   return (
     <header className="bg-surface-strong text-surface-strong-fg shadow-sm">
       {/* right = max-content para que el usuario use el espacio que necesite */}
@@ -78,7 +69,7 @@ const Header: React.FC<HeaderProps> = ({
               size="icon"
               className="text-white hover:bg-white/10 shrink-0"
               aria-label="Ver reportes"
-              onClick={handleShowPowerBIClick}
+              onClick={onShowPowerBI}
               title="Ver reportes de Power BI"
             >
               <BarChart2 className="h-5 w-5" />

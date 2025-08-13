@@ -81,14 +81,6 @@ class ReportedPermissionBase(BaseModel):
     note: str
     status: str = "Pendiente"
     response: Optional[str] = None
-    
-    def model_dump(self, **kwargs):
-        # Asegurarse de que las fechas se conviertan a cadenas ISO
-        data = super().model_dump(**kwargs)
-        if 'date' in data and data['date'] is not None:
-            if hasattr(data['date'], 'isoformat'):
-                data['date'] = data['date'].isoformat()
-        return data
 
 class ReportedPermissionCreate(ReportedPermissionBase):
     pass

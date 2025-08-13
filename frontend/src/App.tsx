@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Toaster } from 'sonner';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 
 // Application components
 import FormularioHoras from './components/FormularioHoras';
@@ -59,10 +59,16 @@ function App() {
 
   const handleBackToForm = () => {
     setShowPowerBI(false);
+    // Navegar a la ruta /horas cuando se hace clic en el botón de volver
+    navigate('/horas');
   };
+
+  const navigate = useNavigate();
 
   const handleShowPowerBI = () => {
     setShowPowerBI(true);
+    // Navegar a la ruta /powerbi usando el router de React
+    navigate('/powerbi');
   };
 
   // Componente de rutas protegidas
