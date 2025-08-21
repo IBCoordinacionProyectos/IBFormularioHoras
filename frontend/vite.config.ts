@@ -21,14 +21,16 @@ function getSecurityHeaders(mode: string) {
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
     'Content-Security-Policy': [
-      "default-src 'self';",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval';",
-      "style-src 'self' 'unsafe-inline';",
-      "img-src 'self' data: blob: https:;",
-      "font-src 'self';",
-      `connect-src 'self' ${backendDomain} https: wss:;`,
-      "form-action 'self';",
-      "frame-ancestors 'none';"
+      `default-src 'self' https://horas.yeisonduque.top;`,
+      `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://horas.yeisonduque.top;`,
+      `style-src 'self' 'unsafe-inline' https://horas.yeisonduque.top;`,
+      `img-src 'self' data: blob: https: https://horas.yeisonduque.top;`,
+      `font-src 'self' https://horas.yeisonduque.top;`,
+      `connect-src 'self' ${backendDomain} https://horas.yeisonduque.top wss:;`,
+      `form-action 'self' https://horas.yeisonduque.top;`,
+      `frame-ancestors 'none';`,
+      `base-uri 'self';`,
+      `object-src 'none';`
     ].join(' ')
   };
 }
