@@ -38,8 +38,12 @@ export default defineConfig(({ mode, command }) => ({
     react({
       jsxImportSource: '@emotion/react',
       babel: {
-        plugins: ['@emotion/babel-plugin']
-      }
+        plugins: [
+          ['@emotion/babel-plugin', { sourceMap: false }]
+        ]
+      },
+      // Ensure JSX runtime is set to automatic for Emotion
+      jsxRuntime: 'automatic'
     }),
     // Gzip precomprimido
     viteCompression({

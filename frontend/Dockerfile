@@ -7,6 +7,7 @@ ENV NPM_CONFIG_PRODUCTION=false \
     NPM_CONFIG_FUND=false \
     NPM_CONFIG_AUDIT=false \
     NPM_CONFIG_PREFER_OFFLINE=true \
+    NPM_CONFIG_LEGACY_PEER_DEPS=true \
     npm_config_fetch_timeout=300000 \
     npm_config_fetch_retries=5 \
     npm_config_cache=/tmp/npm-cache \
@@ -19,7 +20,10 @@ RUN npm config set registry https://registry.npmmirror.com
 COPY package.json package-lock.json ./
 
 # Instalación limpia de dependencias incluyendo devDependencies
-RUN npm ci --no-audit --no-fund --include=dev
+RUN npm ci --no-audit --no-fund --legacy-peer-deps
+
+# Verificación de que el plugin de Emotion esté instalado
+RUN node -p "require.resolve('@emotion/babel-plugin/package.json')"
 
 # =============== build =================
 FROM node:20-alpine AS builder
