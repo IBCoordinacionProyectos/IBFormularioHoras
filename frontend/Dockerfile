@@ -18,9 +18,11 @@ COPY vite.config.ts ./
 # (usa ci si tienes package-lock.json confiable; si no, cae a install)
 RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
-# 🔧 Rollup en Alpine necesita el binario MUSL; lo forzamos a la MISMA versión
-RUN ROLLUP_VERSION=$(node -p "require('./node_modules/rollup/package.json').version") \
- && npm i -D @rollup/rollup-linux-x64-musl@${ROLLUP_VERSION} --no-save
+# 🔧 Instala el binario MUSL de Rollup para Alpine
+RUN if [ -f "./node_modules/rollup/package.json" ]; then \
+    ROLLUP_VERSION=$(node -p "require('./node_modules/rollup/package.json').version") && \
+    npm i -D @rollup/rollup-linux-x64-musl@${ROLLUP_VERSION} --no-save; \
+    fi
 
 # =========================
 # Etapa de build
