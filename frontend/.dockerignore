@@ -1,0 +1,14 @@
+node_modules
+dist
+build
+.cache
+.pnpm-store
+.next
+out
+coverage
+.vscode
+.idea
+.DS_Store
+.git
+.gitignore
+*.log
