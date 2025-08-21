@@ -7,11 +7,11 @@ WORKDIR /app
 # Asegura que se instalen devDependencies (vite, plugins, etc.)
 ENV NPM_CONFIG_PRODUCTION=false
 
-# Solo lockfiles para cache estable
+# Copia archivos necesarios para la instalación
 COPY package*.json ./
 
-# Instala dependencias
-RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+# Instala dependencias incluyendo devDependencies
+RUN npm install --legacy-peer-deps
 
 # Binario MUSL de Rollup para Alpine (evita "Exec format error")
 RUN if [ -f "./node_modules/rollup/package.json" ]; then \
@@ -26,17 +26,20 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Reusa node_modules resueltos en deps
+# Copia node_modules con todas las dependencias incluyendo devDependencies
 COPY --from=deps /app/node_modules ./node_modules
-COPY package*.json ./
+COPY --from=deps /app/package*.json ./
 
-# Copia SOLO fuentes y configs necesarias (evita arrastrar node_modules del host)
+# Copia archivos necesarios para el build
 COPY tsconfig*.json ./
 COPY vite.config.* ./
 COPY postcss.config.js tailwind.config.js ./
 COPY public ./public
 COPY src ./src
 COPY index.html ./
+
+# Instala Vite globalmente para asegurar que esté disponible
+RUN npm install -g vite@^4.4.0
 
 # Build de producción
 RUN npm run build
