@@ -1,29 +1,29 @@
-// FormularioHoras.tsx
+// FormularioPermisos.tsx
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { toast, Toaster } from 'sonner';
+
+import { cn } from '../lib/utils';
 import Header from './Header';
 
-import { toast, Toaster } from 'sonner';
 import {
   Calendar as CalendarIcon,
-  Briefcase,
   Save,
   Pencil,
-  ListChecks,
-  ClipboardList,
   XCircle,
   PlusCircle,
   Loader2,
+  Clock,
   Folder,
-  Star,
-  ArrowUpDown,
   Minus,
   Plus,
+  Star,
   Info,
-  Undo2,
-  Clock,
-  BarChart2,
+  ArrowUpDown,
+  Briefcase,
+  ListChecks,
+  ClipboardList,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -31,7 +31,6 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Calendar } from './ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { cn } from '../lib/utils';
 
 import { FormSelect } from './formulario/FormSelect';
 import { ActivityItem } from './formulario/ActivityItem';
@@ -39,35 +38,52 @@ import { ActivityListSkeleton } from './formulario/ActivityListSkeleton';
 import { EmptyState } from './formulario/EmptyState';
 import { TotalHoursProgress } from './formulario/TotalHoursProgress';
 
+// APIs correctas
 import {
+  DailyActivity,
+  getDailyActivities,
   submitHours,
+  updateHour,
+  deleteHour,
+} from '../api/horasApi';
+
+import {
+  Project,
   getProjects,
   getProjectStages,
   getDisciplinesByStage,
   getActivitiesByDiscipline,
-  getDailyActivities,
-  deleteHour,
-  updateHour,
-  type DailyActivity,
-} from '../api/horasApi';
+  sortAZ,
+} from '../api/permissionsApi';
 
-// Props e interfaces
-interface FormularioHorasProps {
-  onSuccess: () => void;
+// ========================
+// Tipos & Props
+// ========================
+interface FormularioPermisosProps {
+  onSuccess?: () => void;
   employeeId: number;
   employeeName: string;
   onLogout: () => void;
-  onShowPowerBI: () => void;
   onNavigateToHours: () => void;
-  onNavigateToPermissions: () => void;
+  onShowPowerBI?: () => void;
 }
-
-interface Project { code: string; name: string }
 
 type Activity = DailyActivity;
 
-const initialFormData = (employeeId: number) => ({
-  employee_id: String(employeeId),
+type PermissionFormData = {
+  employee_id: number;
+  project_code: string;
+  phase: string;
+  discipline: string;
+  activity: string;
+  hours: string; // UI-friendly; derivamos number aparte
+  note?: string;
+};
+
+type Favorite = { project_code: string; phase: string; discipline: string; activity: string };
+
+const initialFormData = (employeeId: number): PermissionFormData => ({
+  employee_id: employeeId,
   project_code: '',
   phase: '',
   discipline: '',
@@ -76,39 +92,45 @@ const initialFormData = (employeeId: number) => ({
   note: '',
 });
 
-const DRAFT_KEY = 'fh_form_draft_v1';
-
-// Helper: ordenar A-Z / 0-9
-const sortAZ = (arr: string[]) =>
-  [...arr].sort((a, b) => a.localeCompare(b, 'es', { numeric: true, sensitivity: 'base' }));
-
-// Comparator: primero letras, luego números
+// Preferir letras antes que números; orden "humano" con soporte numérico
 const projectComparator = (a: Project, b: Project) => {
-  const aCode = (a.code ?? '').trim();
-  const bCode = (b.code ?? '').trim();
-  const aStartsWithLetter = /^[A-Za-zÁÉÍÓÚÜÑ]/i.test(aCode);
-  const bStartsWithLetter = /^[A-Za-zÁÉÍÓÚÜÑ]/i.test(bCode);
-  if (aStartsWithLetter !== bStartsWithLetter) return aStartsWithLetter ? -1 : 1;
-  // dentro del mismo grupo, ordenar natural A-Z/0-9
-  return aCode.localeCompare(bCode, 'es', { numeric: true, sensitivity: 'base' });
+  const startsWithNum = (s: string) => /^\d/.test(s);
+  const an = startsWithNum(a.code);
+  const bn = startsWithNum(b.code);
+  if (an && !bn) return 1;
+  if (!an && bn) return -1;
+  return a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' });
 };
 
-const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId, employeeName, onLogout, onShowPowerBI }) => {
-  const [formData, setFormData] = useState(initialFormData(employeeId));
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [dailyActivities, setDailyActivities] = useState<Activity[]>([]);
+// ========================
+// Componente
+// ========================
+const FormularioPermisos: React.FC<FormularioPermisosProps> = ({
+  onSuccess,
+  employeeId,
+  employeeName,
+  onLogout,
+  onNavigateToHours,
+  onShowPowerBI,
+}) => {
+  const [formData, setFormData] = useState<PermissionFormData>(initialFormData(employeeId));
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
   const [projects, setProjects] = useState<Project[]>([]);
   const [stages, setStages] = useState<string[]>([]);
   const [disciplines, setDisciplines] = useState<string[]>([]);
   const [activities, setActivities] = useState<string[]>([]);
+
+  const [dailyActivities, setDailyActivities] = useState<Activity[]>([]);
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
 
-  type Favorite = { project_code: string; phase: string; discipline: string; activity: string };
   const FAV_KEY = useMemo(() => `fh_favorites_v1_${employeeId}`, [employeeId]);
-  const [favorites, setFavorites] = useState<Favorite[]>([]);
+  const DRAFT_KEY = useMemo(() => `fh_draft_v1_${employeeId}`, [employeeId]);
 
+  const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [isDirty, setIsDirty] = useState<boolean>(false);
+
   const [loading, setLoading] = useState({
     submit: false,
     projects: true,
@@ -120,8 +142,9 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
   });
 
   const hoursInputRef = useRef<HTMLInputElement | null>(null);
-  const undoTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const favScrollRef = useRef<HTMLDivElement | null>(null);
+
   const handleFavWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
     if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
       e.preventDefault();
@@ -131,22 +154,26 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
   }, []);
 
   const selectedProjectName = useMemo(
-    () => projects.find(p => p.code === formData.project_code)?.name || '',
+    () => projects.find((p) => p.code === formData.project_code)?.name || '',
     [formData.project_code, projects]
   );
+
   const hoursNumber = useMemo(() => {
     const raw = String(formData.hours ?? '').replace(',', '.').trim();
     const n = Number(raw);
     return Number.isFinite(n) ? n : 0;
   }, [formData.hours]);
+
   const totalHoursToday = useMemo(
     () => dailyActivities.reduce((sum, a) => sum + (Number(a.hours) || 0), 0),
     [dailyActivities]
   );
 
-  const [errors, setErrors] = useState<Partial<Record<keyof ReturnType<typeof initialFormData>, string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<keyof PermissionFormData, string>>>({});
+
+  // Validación reactiva
   useEffect(() => {
-    const newErrors: typeof errors = {};
+    const newErrors: Partial<Record<keyof PermissionFormData, string>> = {};
     if (!formData.project_code) newErrors.project_code = 'Selecciona un proyecto';
     if (!formData.phase) newErrors.phase = 'Selecciona una etapa';
     if (!formData.discipline) newErrors.discipline = 'Selecciona una disciplina';
@@ -155,34 +182,63 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
     setErrors(newErrors);
   }, [formData, hoursNumber]);
 
+  // Borrador local
   useEffect(() => {
     const raw = localStorage.getItem(DRAFT_KEY);
-    if (raw) { try {
-      const draft = JSON.parse(raw);
-      setFormData((prev) => ({ ...prev, ...draft, employee_id: String(employeeId) }));
-    } catch {} }
-  }, [employeeId]);
-  useEffect(() => { localStorage.setItem(DRAFT_KEY, JSON.stringify(formData)); }, [formData]);
+    if (raw) {
+      try {
+        const draft = JSON.parse(raw);
+        setFormData((prev) => ({
+          ...prev,
+          ...draft,
+          employee_id: employeeId, // asegurar número
+        }));
+      } catch {}
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [DRAFT_KEY]);
 
   useEffect(() => {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
+  }, [DRAFT_KEY, formData]);
+
+  // Favoritos
+  useEffect(() => {
     const raw = localStorage.getItem(FAV_KEY);
-    if (raw) try { setFavorites(JSON.parse(raw)); } catch {}
+    if (raw) {
+      try {
+        setFavorites(JSON.parse(raw));
+      } catch {}
+    }
   }, [FAV_KEY]);
-  const saveFavorites = (next: Favorite[]) => { setFavorites(next); localStorage.setItem(FAV_KEY, JSON.stringify(next)); };
+
+  const saveFavorites = (next: Favorite[]) => {
+    setFavorites(next);
+    localStorage.setItem(FAV_KEY, JSON.stringify(next));
+  };
 
   const currentFavObj = useMemo(() => {
     if (!formData.project_code || !formData.phase || !formData.discipline || !formData.activity) return null;
-    return { project_code: formData.project_code, phase: formData.phase, discipline: formData.discipline, activity: formData.activity } as Favorite;
+    return {
+      project_code: formData.project_code,
+      phase: formData.phase,
+      discipline: formData.discipline,
+      activity: formData.activity,
+    } as Favorite;
   }, [formData.project_code, formData.phase, formData.discipline, formData.activity]);
+
   const isCurrentFavorite = useMemo(() => {
     if (!currentFavObj) return false;
-    return favorites.some(f => JSON.stringify(f) === JSON.stringify(currentFavObj));
+    return favorites.some((f) => JSON.stringify(f) === JSON.stringify(currentFavObj));
   }, [favorites, currentFavObj]);
 
   const toggleFavorite = () => {
-    if (!currentFavObj) { toast.error('Completa Proyecto, Etapa, Disciplina y Actividad para usar favoritos'); return; }
+    if (!currentFavObj) {
+      toast.error('Completa Proyecto, Etapa, Disciplina y Actividad para usar favoritos');
+      return;
+    }
     if (isCurrentFavorite) {
-      const next = favorites.filter(f => JSON.stringify(f) !== JSON.stringify(currentFavObj));
+      const next = favorites.filter((f) => JSON.stringify(f) !== JSON.stringify(currentFavObj));
       saveFavorites(next);
       toast.message('Eliminado de favoritos');
     } else {
@@ -192,37 +248,43 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
   };
 
   const visibleActivities = useMemo(() => {
-    let list = [...dailyActivities];
-    list.sort((a, b) => (a.id || '').localeCompare(b.id || ''));
-    if (sortDir === 'desc') list.reverse();
-    return list;
+    const list = [...dailyActivities].sort((a, b) =>
+      String(a.id ?? '').localeCompare(String(b.id ?? ''), undefined, { numeric: true })
+    );
+    return sortDir === 'desc' ? list.reverse() : list;
   }, [dailyActivities, sortDir]);
 
   useEffect(() => {
     const base = initialFormData(employeeId);
-    const changed = JSON.stringify({ ...formData, employee_id: undefined }) !== JSON.stringify({ ...base, employee_id: undefined });
+    const changed =
+      JSON.stringify({ ...formData, employee_id: undefined }) !==
+      JSON.stringify({ ...base, employee_id: undefined });
     setIsDirty(changed || Boolean(editingActivityId));
   }, [formData, editingActivityId, employeeId]);
 
-  const refreshDailyActivities = useCallback(async (date: Date, id: string) => {
-    setLoading((p) => ({ ...p, dailyActivities: true }));
-    try {
-      const dateString = format(date, 'yyyy-MM-dd');
-      const acts = await getDailyActivities(dateString, Number(id));
-      setDailyActivities(acts);
-    } catch (e) {
-      toast.error('Error al cargar las actividades del día.');
-      console.error(e);
-    } finally {
-      setLoading((p) => ({ ...p, dailyActivities: false }));
-    }
-  }, []);
+  // Data fetching
+  const refreshDailyActivities = useCallback(
+    async (date: Date, id: string) => {
+      setLoading((p) => ({ ...p, dailyActivities: true }));
+      try {
+        const dateString = format(date, 'yyyy-MM-dd');
+        const acts = await getDailyActivities(dateString, Number(id));
+        setDailyActivities(acts);
+      } catch (e) {
+        toast.error('Error al cargar las actividades del día.');
+        console.error(e);
+      } finally {
+        setLoading((p) => ({ ...p, dailyActivities: false }));
+      }
+    },
+    []
+  );
 
   const fetchProjects = useCallback(async () => {
     setLoading((p) => ({ ...p, projects: true }));
     try {
       const data = await getProjects();
-      const sorted = [...data].sort(projectComparator); // letras primero, luego números
+      const sorted = [...data].sort(projectComparator);
       setProjects(sorted);
     } catch (e) {
       toast.error('Error al cargar proyectos.');
@@ -236,7 +298,9 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
     setLoading((p) => ({ ...p, stages: true }));
     try {
       const data = await getProjectStages(projectCode);
-      const cleaned = (data || []).filter((v: any) => v != null && String(v).trim() !== '').map(String);
+      const cleaned = (data || [])
+        .filter((v: any) => v != null && String(v).trim() !== '')
+        .map(String);
       const sorted = sortAZ(cleaned);
       setStages(sorted);
       return sorted;
@@ -254,7 +318,9 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
     setLoading((p) => ({ ...p, disciplines: true }));
     try {
       const data = await getDisciplinesByStage(projectCode, stage);
-      const cleaned = (data || []).filter((v: any) => v != null && String(v).trim() !== '').map(String);
+      const cleaned = (data || [])
+        .filter((v: any) => v != null && String(v).trim() !== '')
+        .map(String);
       const sorted = sortAZ(cleaned);
       setDisciplines(sorted);
       return sorted;
@@ -267,79 +333,110 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
     }
   }, []);
 
-  const fetchActivities = useCallback(async (projectCode: string, stage: string, discipline: string) => {
-    if (!projectCode || !stage || !discipline) return [] as string[];
-    setLoading((p) => ({ ...p, activities: true }));
-    try {
-      const data = await getActivitiesByDiscipline(projectCode, stage, discipline);
-      const cleaned = (data || []).filter((v: any) => v != null && String(v).trim() !== '').map(String);
-      const sorted = sortAZ(cleaned);
-      setActivities(sorted);
-      return sorted;
-    } catch (e) {
-      toast.error('Error al cargar actividades.');
-      setActivities([]);
-      return [];
-    } finally {
-      setLoading((p) => ({ ...p, activities: false }));
-    }
-  }, []);
+  const fetchActivities = useCallback(
+    async (projectCode: string, stage: string, discipline: string) => {
+      if (!projectCode || !stage || !discipline) return [] as string[];
+      setLoading((p) => ({ ...p, activities: true }));
+      try {
+        const data = await getActivitiesByDiscipline(projectCode, stage, discipline);
+        const cleaned = (data || [])
+          .filter((v: any) => v != null && String(v).trim() !== '')
+          .map(String);
+        const sorted = sortAZ(cleaned);
+        setActivities(sorted);
+        return sorted;
+      } catch (e) {
+        toast.error('Error al cargar actividades.');
+        setActivities([]);
+        return [];
+      } finally {
+        setLoading((p) => ({ ...p, activities: false }));
+      }
+    },
+    []
+  );
 
-  const applyFavorite = useCallback(async (fav: Favorite) => {
-    try {
-      setFormData((prev) => ({ ...prev, project_code: fav.project_code, phase: '', discipline: '', activity: '' }));
-      const st = await fetchStages(fav.project_code);
-      if (st && st.includes(fav.phase)) {
-        const ds = await fetchDisciplines(fav.project_code, fav.phase);
-        if (ds && ds.includes(fav.discipline)) {
-          const ac = await fetchActivities(fav.project_code, fav.phase, fav.discipline);
-          if (ac && ac.includes(fav.activity)) {
-            setFormData({
-              employee_id: String(employeeId),
-              project_code: fav.project_code,
-              phase: fav.phase,
-              discipline: fav.discipline,
-              activity: fav.activity,
-              hours: '0',
-              note: '',
-            });
+  const applyFavorite = useCallback(
+    async (fav: Favorite) => {
+      try {
+        setFormData((prev) => ({
+          ...prev,
+          project_code: fav.project_code,
+          phase: '',
+          discipline: '',
+          activity: '',
+        }));
+        const st = await fetchStages(fav.project_code);
+        if (st && st.includes(fav.phase)) {
+          setFormData((prev) => ({ ...prev, phase: fav.phase }));
+          const ds = await fetchDisciplines(fav.project_code, fav.phase);
+          if (ds && ds.includes(fav.discipline)) {
+            setFormData((prev) => ({ ...prev, discipline: fav.discipline }));
+            const ac = await fetchActivities(fav.project_code, fav.phase, fav.discipline);
+            if (ac && ac.includes(fav.activity)) {
+              setFormData((prev) => ({ ...prev, activity: fav.activity }));
+            }
           }
         }
+      } catch (e) {
+        console.error(e);
+        toast.error('No se pudo aplicar el favorito');
       }
-    } catch (e) {
-      console.error(e);
-      toast.error('No se pudo aplicar el favorito');
-    }
-  }, [employeeId, fetchStages, fetchDisciplines, fetchActivities]);
+    },
+    [fetchStages, fetchDisciplines, fetchActivities]
+  );
 
-  useEffect(() => { fetchProjects(); }, [fetchProjects]);
-  useEffect(() => { refreshDailyActivities(selectedDate, String(employeeId)); }, [selectedDate, employeeId, refreshDailyActivities]);
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
 
-  const handleDateChange = (date?: Date) => { if (date) setSelectedDate(date); };
+  useEffect(() => {
+    refreshDailyActivities(selectedDate, String(employeeId));
+  }, [selectedDate, employeeId, refreshDailyActivities]);
+
+  // Handlers
+  const handleDateChange = (date?: Date) => {
+    if (date) setSelectedDate(date);
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     const v = name === 'hours' ? value.replace(',', '.') : value;
-    setFormData((prev) => ({ ...prev, [name]: v }));
+    setFormData((prev) => ({ ...prev, [name]: v } as PermissionFormData));
   };
-  const handleNoteKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => { if (e.key === 'Enter' && !e.shiftKey) e.preventDefault(); };
 
-  const handleSelectChange = async (name: keyof ReturnType<typeof initialFormData>, value: string) => {
-    const updated = { ...formData, [name]: value } as ReturnType<typeof initialFormData>;
+  const handleNoteKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) e.preventDefault();
+  };
+
+  const handleSelectChange = async (name: keyof PermissionFormData, value: string) => {
+    const updated: PermissionFormData = { ...formData, [name]: value } as PermissionFormData;
     switch (name) {
       case 'project_code':
-        updated.phase = ''; updated.discipline = ''; updated.activity = '';
-        setFormData(updated); setStages([]); setDisciplines([]); setActivities([]);
+        updated.phase = '';
+        updated.discipline = '';
+        updated.activity = '';
+        setFormData(updated);
+        setStages([]);
+        setDisciplines([]);
+        setActivities([]);
         if (value) await fetchStages(value);
         break;
       case 'phase':
-        updated.discipline = ''; updated.activity = '';
-        setFormData(updated); setDisciplines([]); setActivities([]);
+        updated.discipline = '';
+        updated.activity = '';
+        setFormData(updated);
+        setDisciplines([]);
+        setActivities([]);
         if (value && updated.project_code) await fetchDisciplines(updated.project_code, value);
         break;
       case 'discipline':
         updated.activity = '';
-        setFormData(updated); setActivities([]);
-        if (value && updated.project_code && updated.phase) await fetchActivities(updated.project_code, updated.phase, value);
+        setFormData(updated);
+        setActivities([]);
+        if (value && updated.project_code && updated.phase) {
+          await fetchActivities(updated.project_code, updated.phase, value);
+        }
         break;
       default:
         setFormData(updated);
@@ -351,35 +448,39 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
     setEditingActivityId(null);
   }, [employeeId]);
 
-  const handleEditActivity = useCallback(async (activity: Activity) => {
-    try {
-      if (activity.date) {
-        try {
-          const d = typeof activity.date === 'string' ? parseISO(activity.date) : new Date(activity.date);
-          setSelectedDate(d);
-        } catch {}
+  const handleEditActivity = useCallback(
+    async (activity: Activity) => {
+      try {
+        if (activity.date) {
+          try {
+            const d = typeof activity.date === 'string' ? parseISO(activity.date) : new Date(activity.date);
+            setSelectedDate(d);
+          } catch {}
+        }
+        if (activity.project_code) {
+          await fetchStages(activity.project_code);
+          if (activity.phase) await fetchDisciplines(activity.project_code, activity.phase);
+          if (activity.phase && activity.discipline)
+            await fetchActivities(activity.project_code, activity.phase, activity.discipline);
+        }
+        setFormData({
+          employee_id: employeeId,
+          project_code: activity.project_code || '',
+          phase: activity.phase || '',
+          discipline: activity.discipline || '',
+          activity: activity.activity || '',
+          hours: String(activity.hours ?? '0'),
+          note: activity.note || '',
+        });
+        setEditingActivityId(String(activity.id));
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (e) {
+        console.error(e);
+        toast.error('Error al cargar la actividad para edición');
       }
-      if (activity.project_code) {
-        await fetchStages(activity.project_code);
-        if (activity.phase) await fetchDisciplines(activity.project_code, activity.phase);
-        if (activity.phase && activity.discipline) await fetchActivities(activity.project_code, activity.phase, activity.discipline);
-      }
-      setFormData({
-        employee_id: String(employeeId),
-        project_code: activity.project_code || '',
-        phase: activity.phase || '',
-        discipline: activity.discipline || '',
-        activity: activity.activity || '',
-        hours: String(activity.hours ?? '0'),
-        note: activity.note || '',
-      });
-      setEditingActivityId(String(activity.id));
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (e) {
-      console.error(e);
-      toast.error('Error al cargar la actividad para edición');
-    }
-  }, [employeeId, fetchStages, fetchDisciplines, fetchActivities]);
+    },
+    [employeeId, fetchStages, fetchDisciplines, fetchActivities]
+  );
 
   const [undoData, setUndoData] = useState<Activity | null>(null);
   const triggerUndoBanner = (activity: Activity) => {
@@ -387,47 +488,61 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     undoTimerRef.current = setTimeout(() => setUndoData(null), 8000);
   };
+
   const handleUndoDelete = async () => {
     if (!undoData) return;
-    const a = undoData; setUndoData(null);
+    const a = undoData;
+    setUndoData(null);
     try {
+      // recrea el registro eliminado
       await submitHours({
+        employee_id: employeeId,
+        date: format(selectedDate, 'yyyy-MM-dd'),
         project_code: a.project_code,
         phase: a.phase,
         discipline: a.discipline,
         activity: a.activity,
-        hours: a.hours,
+        hours: Number(a.hours) || 0,
         note: a.note || '',
-        date: format(selectedDate, 'yyyy-MM-dd'),
-        employee_id: employeeId,
       });
       await refreshDailyActivities(selectedDate, String(employeeId));
-      toast.success('Registro restaurado');
+      toast.success('Actividad restaurada');
     } catch (e) {
-      toast.error('No se pudo restaurar');
+      console.error(e);
+      toast.error('Error al restaurar la actividad');
     }
   };
 
-  const coreSubmit = async () => {
-    const submissionData = {
+  const doSubmit = useCallback(async (): Promise<boolean> => {
+    if (Object.keys(errors).length > 0) {
+      toast.error('Por favor completa todos los campos requeridos');
+      return false;
+    }
+
+    const payload = {
+      employee_id: employeeId,
+      date: format(selectedDate, 'yyyy-MM-dd'),
       project_code: formData.project_code,
       phase: formData.phase,
       discipline: formData.discipline,
       activity: formData.activity,
       hours: hoursNumber,
       note: formData.note || '',
-      date: format(selectedDate, 'yyyy-MM-dd'),
-      employee_id: employeeId,
+      id: editingActivityId || undefined,
     };
 
     const toastId = toast.loading(editingActivityId ? 'Actualizando actividad...' : 'Guardando actividad...');
     setLoading((p) => ({ ...p, submit: true }));
-
     try {
-      if (editingActivityId) { await updateHour(editingActivityId, submissionData); }
-      else { await submitHours(submissionData); }
-
-      toast.success(`Actividad ${editingActivityId ? 'actualizada' : 'guardada'} con éxito.`, { id: toastId, duration: 1800 });
+      if (editingActivityId) {
+        await updateHour(editingActivityId, payload);
+      } else {
+        await submitHours(payload);
+      }
+      toast.success(`Actividad ${editingActivityId ? 'actualizada' : 'guardada'} con éxito.`, {
+        id: toastId,
+        duration: 1800,
+      });
       await refreshDailyActivities(selectedDate, String(employeeId));
       onSuccess?.();
       return true;
@@ -438,19 +553,31 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
     } finally {
       setLoading((p) => ({ ...p, submit: false }));
     }
-  };
+  }, [
+    editingActivityId,
+    employeeId,
+    errors,
+    formData.activity,
+    formData.discipline,
+    formData.phase,
+    formData.project_code,
+    formData.note,
+    hoursNumber,
+    selectedDate,
+    refreshDailyActivities,
+    onSuccess,
+  ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (Object.keys(errors).length) { toast.error('Revisa los campos marcados'); return; }
-    const ok = await coreSubmit();
+    const ok = await doSubmit();
     if (ok) resetForm();
   };
 
   const handleDelete = async (id: string) => {
-    const prev = dailyActivities.find(a => String(a.id) === String(id));
+    const prev = dailyActivities.find((a) => String(a.id) === String(id));
     try {
-      setLoading(p => ({ ...p, delete: id }));
+      setLoading((p) => ({ ...p, delete: id }));
       await deleteHour(id);
       await refreshDailyActivities(selectedDate, String(employeeId));
       if (prev) triggerUndoBanner(prev);
@@ -459,7 +586,7 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
       console.error(e);
       toast.error('No se pudo eliminar');
     } finally {
-      setLoading(p => ({ ...p, delete: null }));
+      setLoading((p) => ({ ...p, delete: null }));
     }
   };
 
@@ -469,36 +596,39 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
     setFormData((prev) => ({ ...prev, hours: String(next) }));
   };
 
+  // Atajos de teclado
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'enter') {
         e.preventDefault();
-        (async () => { if (!loading.submit) { const ok = await coreSubmit(); if (ok) resetForm(); } })();
+        (async () => {
+          if (!loading.submit) {
+            const ok = await doSubmit();
+            if (ok) resetForm();
+          }
+        })();
       }
-      if (e.key === 'Escape') { resetForm(); }
+      if (e.key === 'Escape') {
+        resetForm();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [coreSubmit, loading.submit, resetForm]);
+  }, [doSubmit, loading.submit, resetForm]);
 
-  // Navegar a la vista de permisos
+  // Navegación declarativa (se maneja fuera: App.tsx)
   const handleNavigateToPermissions = () => {
-    // La lógica de navegación se maneja en App.tsx
-  };
-
-  // Navegar a la vista de horas
-  const handleNavigateToHours = () => {
-    // La lógica de navegación se maneja en App.tsx
+    /* noop: handled in router/App.tsx */
   };
 
   return (
     <div className="min-h-screen bg-[#f2f6fd] text-foreground">
       <Toaster position="top-right" richColors />
-      <Header 
-        employeeName={employeeName} 
+      <Header
+        employeeName={employeeName}
         onLogout={onLogout}
-        onShowPowerBI={onShowPowerBI}
-        onNavigateToHours={handleNavigateToHours}
+        onShowPowerBI={onShowPowerBI || (() => {})}
+        onNavigateToHours={onNavigateToHours}
         onNavigateToPermissions={handleNavigateToPermissions}
         currentView="hours"
       />
@@ -507,8 +637,6 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .fav-strip { overscroll-behavior-y: contain; touch-action: pan-x; }
-
-        /* 👉 Fuerza saltos de línea en textos sin espacios y evita desbordes */
         .text-wrap, .text-wrap *{
           overflow-wrap: anywhere;
           word-break: break-word;
@@ -565,7 +693,10 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                   </label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" className={cn('w-full justify-start font-normal h-10', !selectedDate && 'text-muted-foreground')}>
+                      <Button
+                        variant="outline"
+                        className={cn('w-full justify-start font-normal h-10', !selectedDate && 'text-muted-foreground')}
+                      >
                         <span>{format(selectedDate, 'PPP', { locale: es })}</span>
                       </Button>
                     </PopoverTrigger>
@@ -575,16 +706,20 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                   </Popover>
                 </div>
 
-                {/* GRID: columna izquierda más estrecha */}
+                {/* GRID */}
                 <div className="grid grid-cols-1 md:grid-cols-[320px_minmax(0,1fr)] gap-6 items-start">
-                  {/* Código de Proyecto (col izq) */}
+                  {/* Código de Proyecto */}
                   <div className="text-wrap">
                     <FormSelect
                       label="Código de Proyecto"
                       name="project_code"
                       value={formData.project_code}
                       onValueChange={handleSelectChange as any}
-                      options={projects.map((p) => ({ value: p.code, label: p.code, dropdownLabel: `${p.code} - ${p.name}` }))}
+                      options={projects.map((p) => ({
+                        value: p.code,
+                        label: p.code,
+                        dropdownLabel: `${p.code} - ${p.name}`,
+                      }))}
                       placeholder="Seleccione un proyecto"
                       loading={loading.projects}
                       disabled={loading.projects}
@@ -596,15 +731,17 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                     </p>
                   </div>
 
-                  {/* Nombre del Proyecto (col der) */}
+                  {/* Nombre del Proyecto */}
                   <div className="space-y-2 text-wrap">
                     <label className="block text-sm font-medium text-foreground/80 mb-1">
-                      <span className="inline-flex items-center gap-1"><Folder className="h-4 w-4" /> Nombre del Proyecto</span>
+                      <span className="inline-flex items-center gap-1">
+                        <Folder className="h-4 w-4" /> Nombre del Proyecto
+                      </span>
                     </label>
                     <Input value={selectedProjectName} readOnly className="bg-muted/50" aria-label="Nombre de proyecto seleccionado" />
                   </div>
 
-                  {/* Etapa (izq) */}
+                  {/* Etapa */}
                   <div className="text-wrap">
                     <FormSelect
                       label="Etapa"
@@ -621,7 +758,7 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                     <p className="mt-1 text-xs text-muted-foreground">Etapas disponibles para el proyecto elegido.</p>
                   </div>
 
-                  {/* Disciplina (der) */}
+                  {/* Disciplina */}
                   <div className="text-wrap">
                     <FormSelect
                       label="Disciplina"
@@ -638,7 +775,7 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                     <p className="mt-1 text-xs text-muted-foreground">Se filtran según la etapa seleccionada.</p>
                   </div>
 
-                  {/* Actividad (izq) */}
+                  {/* Actividad */}
                   <div className="w-full md:w-[320px] text-wrap">
                     <FormSelect
                       label="Actividad"
@@ -654,7 +791,7 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                     />
                   </div>
 
-                  {/* Horas (der) – input a la izquierda, botones a la derecha */}
+                  {/* Horas */}
                   <div className="flex flex-col text-wrap">
                     <label htmlFor="hours" className="block text-sm font-medium text-foreground/80 mb-1">
                       <span className="inline-flex items-center gap-1">
@@ -663,7 +800,6 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                     </label>
 
                     <div className="flex items-center gap-1">
-                      {/* Botón Restar */}
                       <Button
                         type="button"
                         variant="outline"
@@ -675,7 +811,6 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                         <Minus className="h-4 w-4" />
                       </Button>
 
-                      {/* Botón Sumar */}
                       <Button
                         type="button"
                         variant="outline"
@@ -687,7 +822,6 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                         <Plus className="h-4 w-4" />
                       </Button>
 
-                      {/* Input de horas */}
                       <Input
                         id="hours"
                         name="hours"
@@ -700,7 +834,6 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                         className="h-10 w-[100px] shrink-0 rounded-md mr-0"
                       />
 
-                      {/* Botón Favorito */}
                       <Button
                         type="button"
                         variant={isCurrentFavorite ? 'default' : 'outline'}
@@ -713,7 +846,7 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                     </div>
                   </div>
 
-                  {/* Chips de favoritos (ocupa ambas columnas) */}
+                  {/* Favoritos */}
                   {favorites.length > 0 && (
                     <div className="md:col-span-2">
                       <div
@@ -740,7 +873,7 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                     </div>
                   )}
 
-                  {/* Nota (Opcional) – 2 líneas */}
+                  {/* Nota */}
                   <div className="md:col-span-2 w-full text-wrap">
                     <label htmlFor="note" className="block text-sm font-medium text-foreground/80 mb-1">
                       <span className="inline-flex items-center gap-1">
@@ -764,11 +897,18 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                 <div className="mt-6 flex items-center justify-end gap-3">
                   <Button
                     type="submit"
-                    onClick={(e) => { e.preventDefault(); handleSubmit(e as any); }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleSubmit(e as any);
+                    }}
                     disabled={loading.submit || Object.keys(errors).length > 0}
                     className="h-11"
                   >
-                    {loading.submit ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    {loading.submit ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="mr-2 h-4 w-4" />
+                    )}
                     {editingActivityId ? 'Actualizar' : 'Guardar'}
                   </Button>
 
@@ -792,7 +932,7 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                 </CardTitle>
                 <Button
                   type="button"
-                  variant="outline"
+                variant="outline"
                   size="icon"
                   title="Ordenar"
                   onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
@@ -816,15 +956,10 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                   <ActivityListSkeleton />
                 ) : visibleActivities.length > 0 ? (
                   <>
-                    {/* Lista sin overflow horizontal y con saltos de línea */}
                     <div className="space-y-4 max-h-[520px] overflow-y-auto overflow-x-hidden pr-1 text-wrap">
                       {visibleActivities.map((activity) => (
-                        <div key={activity.id} className="text-wrap">
-                          <ActivityItem
-                            activity={activity}
-                            onEdit={handleEditActivity}
-                            onDelete={handleDelete}
-                          />
+                        <div key={String(activity.id)} className="text-wrap">
+                          <ActivityItem activity={activity} onEdit={handleEditActivity} onDelete={handleDelete} />
                         </div>
                       ))}
                     </div>
@@ -845,7 +980,7 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
         <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 bg-red-50 border border-red-200 text-red-700 shadow rounded-full px-4 py-2 flex items-center gap-3">
           <span className="text-sm">Registro eliminado.</span>
           <Button size="sm" variant="outline" onClick={handleUndoDelete}>
-            <Undo2 className="h-4 w-4 mr-1" /> Deshacer
+            Deshacer
           </Button>
         </div>
       )}
@@ -853,4 +988,4 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
   );
 };
 
-export default FormularioHoras;
+export default FormularioPermisos;

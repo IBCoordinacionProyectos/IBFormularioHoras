@@ -2,26 +2,42 @@
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 from .routers import projects, activities, hours, employees, daily_activities, auth, permissions
+from .middleware.security import SecurityMiddleware, RateLimitMiddleware
 
-app = FastAPI()
+app = FastAPI(title="FormularioHoras API",
+             description="API for managing work hours and activities",
+             version="1.0.0")
 
-# Configuración de CORS
-origins = [
-    "http://localhost",
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "https://yeisonduque.top",
-    "https://www.yeisonduque.top",
-    "https://backend.yeisonduque.top",
-    "http://horas.yeisonduque.top",
-]
+# Configuration
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
+
+# CORS Configuration
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "").split(",")
+if not ALLOWED_ORIGINS:
+    raise ValueError("ALLOWED_ORIGINS must be set in environment variables")
+
+# Add Security Middleware
+app.add_middleware(SecurityMiddleware)
+app.add_middleware(RateLimitMiddleware, calls=100, period=60)  # 100 requests per minute
+
+# Add CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "Accept",
+        "Origin",
+        "X-Requested-With",
+    ],
+    expose_headers=["Content-Length"],
+    max_age=600  # 10 minutes cache for preflight requests
 )
 
 

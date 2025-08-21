@@ -12,7 +12,15 @@ from . import models, schemas
 from .database import SessionLocal, supabase
 
 # Configuración de seguridad
-SECRET_KEY = "your-secret-key-here"  # Cambia esto por una clave secreta segura en producción
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not SECRET_KEY:
+    raise ValueError("JWT_SECRET_KEY must be set in environment variables")
+    
 ALGORITHM = "HS256"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
