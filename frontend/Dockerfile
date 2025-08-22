@@ -28,12 +28,8 @@ RUN npm run build
 # Stage 2: Nginx server
 FROM nginx:stable-alpine
 
-# Create necessary directories and set permissions
-RUN mkdir -p /var/run/nginx && \
-    mkdir -p /var/cache/nginx && \
-    touch /var/run/nginx.pid && \
-    chown -R nginx:nginx /var/run/nginx /var/cache/nginx /var/log/nginx /var/run/nginx.pid && \
-    chmod -R 755 /var/run/nginx /var/cache/nginx /var/log/nginx /var/run/nginx.pid
+# Remove default nginx configs
+RUN rm -rf /etc/nginx/conf.d/*
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
@@ -41,9 +37,12 @@ COPY nginx.conf /etc/nginx/nginx.conf
 # Copy built files from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Set permissions for web content
-RUN chown -R nginx:nginx /usr/share/nginx/html && \
-    chmod -R 755 /usr/share/nginx/html
+# Set permissions for nginx
+RUN chown -R nginx:nginx /var/cache/nginx && \
+    chown -R nginx:nginx /var/log/nginx && \
+    chown -R nginx:nginx /etc/nginx/conf.d && \
+    touch /var/run/nginx.pid && \
+    chown -R nginx:nginx /var/run/nginx.pid
 
 # Switch to non-root user
 USER nginx

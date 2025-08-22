@@ -15,6 +15,16 @@ services:
       - VIRTUAL_HOST=horas.yeisonduque.top
       - LETSENCRYPT_HOST=horas.yeisonduque.top
       - LETSENCRYPT_EMAIL=tu@email.com  # Reemplaza con tu email
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /var/run
+      - /var/cache/nginx
+      - /tmp
+    volumes:
+      - ./frontend/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./frontend/nginx/conf.d/:/etc/nginx/conf.d/:ro
     depends_on:
       - backend
 
