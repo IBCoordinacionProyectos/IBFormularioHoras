@@ -91,10 +91,6 @@ __tests__/
 !.yarn/sdks
 !.yarn/versions
 .pnp.*
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
-
 # =======================================
 # Local development
 # =======================================
