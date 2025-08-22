@@ -54,23 +54,19 @@ FROM nginx:stable-alpine
 RUN rm -rf /usr/share/nginx/html/*
 
 # Copy custom nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/nginx.conf
 
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Create necessary directories and set permissions
-RUN mkdir -p /var/run/nginx && \
-    chown -R nginx:nginx /usr/share/nginx/html && \
-    chmod -R 755 /usr/share/nginx/html && \
-    chown -R nginx:nginx /var/cache/nginx && \
-    chown -R nginx:nginx /var/log/nginx && \
-    chown -R nginx:nginx /etc/nginx/conf.d && \
-    chown -R nginx:nginx /var/run/nginx && \
-    chmod -R 775 /var/run/nginx
+RUN mkdir -p /var/cache/nginx /var/run /var/log/nginx /var/tmp/nginx && \
+    touch /var/run/nginx.pid && \
+    chown -R nginx:nginx /var/cache/nginx /var/run/nginx.pid /var/log/nginx /var/tmp/nginx /etc/nginx/conf.d /usr/share/nginx/html && \
+    chmod -R 755 /var/cache/nginx /var/run/nginx.pid /var/log/nginx /var/tmp/nginx /etc/nginx/conf.d /usr/share/nginx/html
 
-# Switch to non-root user
-USER nginx
+# Set working directory
+WORKDIR /usr/share/nginx/html
 
 # Expose port 80
 EXPOSE 80
