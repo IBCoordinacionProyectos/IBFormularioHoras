@@ -25,34 +25,40 @@ ENV VITE_BACKEND_URL=https://backend.yeisonduque.top
 ENV VITE_ENV=production
 RUN npm run build
 
-# Stage 2: Production image
-FROM node:20-alpine
+# Stage 2: Nginx server
+FROM nginx:stable-alpine
 
-WORKDIR /app
-
-# Set environment variables
-ENV NODE_ENV=production
-ENV NPM_CONFIG_LOGLEVEL=warn
-ENV NODE_OPTIONS=--max_old_space_size=4096
-ENV HOST=0.0.0.0
-
-# Install serve to run the production build
-RUN npm install -g serve
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
 
 # Copy built files from builder
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Create a non-root user and switch to it
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-RUN chown -R appuser:appgroup /app
-USER appuser
+# Copy and set permissions for nginx
+COPY --from=builder /app/nginx.conf /etc/nginx/nginx.conf.template
 
-# Expose port
+# Set environment variables for nginx
+ENV NGINX_PORT=80
+ENV NGINX_HOST=horas.yeisonduque.top
+
+# Create a non-root user and set permissions
+RUN chown -R nginx:nginx /usr/share/nginx/html && \
+    chmod -R 755 /usr/share/nginx/html && \
+    chown -R nginx:nginx /var/cache/nginx && \
+    chown -R nginx:nginx /var/log/nginx && \
+    chown -R nginx:nginx /etc/nginx/conf.d && \
+    touch /var/run/nginx.pid && \
+    chown -R nginx:nginx /var/run/nginx.pid
+
+# Switch to non-root user
+USER nginx
+
+# Expose port 80
 EXPOSE 80
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost/ || exit 1
 
-# Start the application
-CMD ["serve", "-s", "dist", "-l", "80"]
+# Start Nginx server
+CMD ["nginx", "-g", "daemon off;"]
