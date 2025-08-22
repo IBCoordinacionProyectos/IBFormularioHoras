@@ -21,30 +21,20 @@ RUN apk add --no-cache \
     # Add build dependencies for node-gyp and native modules
     libc6-compat \
     # Add build tools for node-sass
-    gcc \
-    g++ \
-    # Add TypeScript and Vite as global dependencies
-    && npm install -g typescript@latest
+    gcc
 
 # Set working directory
 WORKDIR /app
 
 # Copy package files
-COPY package.json .
+COPY package.json package-lock.json ./
 
-# Copy package-lock.json if it exists
-RUN if [ -f package-lock.json ]; then \
-      echo "package-lock.json found"; \
-    else \
-      echo "package-lock.json not found, will use npm install"; \
-    fi
+# Configure npm
+RUN npm config set fetch-retries 5 && \
+    npm config set fetch-timeout 120000
 
 # Install all dependencies including devDependencies
-RUN if [ -f package-lock.json ]; then \
-      npm ci --no-audit --progress=false; \
-    else \
-      npm install --no-audit --progress=false; \
-    fi
+RUN npm ci --no-audit --progress=false
 
 # Verify Vite is installed
 RUN node -p "require.resolve('vite/package.json')"
