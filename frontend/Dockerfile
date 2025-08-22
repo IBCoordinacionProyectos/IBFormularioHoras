@@ -59,12 +59,15 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Set permissions
-RUN chown -R nginx:nginx /usr/share/nginx/html && \
+# Create necessary directories and set permissions
+RUN mkdir -p /var/run/nginx && \
+    chown -R nginx:nginx /usr/share/nginx/html && \
     chmod -R 755 /usr/share/nginx/html && \
     chown -R nginx:nginx /var/cache/nginx && \
     chown -R nginx:nginx /var/log/nginx && \
-    chown -R nginx:nginx /etc/nginx/conf.d
+    chown -R nginx:nginx /etc/nginx/conf.d && \
+    chown -R nginx:nginx /var/run/nginx && \
+    chmod -R 775 /var/run/nginx
 
 # Switch to non-root user
 USER nginx
