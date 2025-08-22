@@ -5,12 +5,18 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+    restart: always
     ports:
-      - "80:3000"  # Mapea el puerto 80 del host al 3000 del contenedor
-    depends_on:
-      - backend
+      - "80:80"
+      - "443:443"
     networks:
       - app-network
+    environment:
+      - VIRTUAL_HOST=horas.yeisonduque.top
+      - LETSENCRYPT_HOST=horas.yeisonduque.top
+      - LETSENCRYPT_EMAIL=tu@email.com  # Reemplaza con tu email
+    depends_on:
+      - backend
 
   backend:
     build:
