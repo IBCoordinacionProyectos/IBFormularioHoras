@@ -28,27 +28,22 @@ RUN npm run build
 # Stage 2: Nginx server
 FROM nginx:stable-alpine
 
+# Create necessary directories and set permissions
+RUN mkdir -p /var/run/nginx && \
+    mkdir -p /var/cache/nginx && \
+    touch /var/run/nginx.pid && \
+    chown -R nginx:nginx /var/run/nginx /var/cache/nginx /var/log/nginx /var/run/nginx.pid && \
+    chmod -R 755 /var/run/nginx /var/cache/nginx /var/log/nginx /var/run/nginx.pid
+
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
 # Copy built files from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy and set permissions for nginx
-COPY --from=builder /app/nginx.conf /etc/nginx/nginx.conf.template
-
-# Set environment variables for nginx
-ENV NGINX_PORT=80
-ENV NGINX_HOST=horas.yeisonduque.top
-
-# Create a non-root user and set permissions
+# Set permissions for web content
 RUN chown -R nginx:nginx /usr/share/nginx/html && \
-    chmod -R 755 /usr/share/nginx/html && \
-    chown -R nginx:nginx /var/cache/nginx && \
-    chown -R nginx:nginx /var/log/nginx && \
-    chown -R nginx:nginx /etc/nginx/conf.d && \
-    touch /var/run/nginx.pid && \
-    chown -R nginx:nginx /var/run/nginx.pid
+    chmod -R 755 /usr/share/nginx/html
 
 # Switch to non-root user
 USER nginx
