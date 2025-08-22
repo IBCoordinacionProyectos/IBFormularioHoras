@@ -8,7 +8,8 @@ WORKDIR /app
 # Set environment variables
 ENV NODE_ENV=production
 ENV NPM_CONFIG_LOGLEVEL=warn
-ENV NPM_CONFIG_PREFER_OFFLINE=true
+# Ensure devDependencies are installed
+ENV NPM_CONFIG_PRODUCTION=false
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 ENV NODE_OPTIONS=--max_old_space_size=4096
 
@@ -16,15 +17,39 @@ ENV NODE_OPTIONS=--max_old_space_size=4096
 RUN apk add --no-cache \
     python3 \
     make \
-    g++
+    g++ \
+    # Add build dependencies for node-gyp and native modules
+    libc6-compat \
+    # Add build tools for node-sass
+    gcc \
+    g++ \
+    # Add TypeScript and Vite as global dependencies
+    && npm install -g typescript@latest
+
+# Set working directory
+WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY package.json .
 
-# Install dependencies
-RUN npm ci --omit=dev --prefer-offline --no-audit --progress=false
+# Copy package-lock.json if it exists
+RUN if [ -f package-lock.json ]; then \
+      echo "package-lock.json found"; \
+    else \
+      echo "package-lock.json not found, will use npm install"; \
+    fi
 
-# Copy source code
+# Install all dependencies including devDependencies
+RUN if [ -f package-lock.json ]; then \
+      npm ci --no-audit --progress=false; \
+    else \
+      npm install --no-audit --progress=false; \
+    fi
+
+# Verify Vite is installed
+RUN node -p "require.resolve('vite/package.json')"
+
+# Copy source code (excluding files in .dockerignore)
 COPY . .
 
 # Build the application
