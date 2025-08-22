@@ -19,7 +19,8 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Database configuration for local development
 # Use localhost for local development with docker
-DATABASE_URL = f"postgresql://postgres:{POSTGRES_PASSWORD}@localhost:5432/postgres"
+# Usando el driver psycopg (versión 3)
+DATABASE_URL = f"postgresql+psycopg://postgres:{POSTGRES_PASSWORD}@localhost:5432/postgres"
 
 # SQLAlchemy setup
 engine = create_engine(DATABASE_URL)
