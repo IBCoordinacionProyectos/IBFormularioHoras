@@ -31,8 +31,12 @@ FROM nginx:stable-alpine
 # Remove default nginx configs
 RUN rm -rf /etc/nginx/conf.d/*
 
+# Create necessary directories
+RUN mkdir -p /var/cache/nginx/client_temp && \
+    mkdir -p /etc/nginx/conf.d
+
 # Copy nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/nginx.conf
 
 # Copy built files from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
@@ -41,9 +45,10 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 RUN chown -R nginx:nginx /var/cache/nginx && \
     chown -R nginx:nginx /var/log/nginx && \
     chown -R nginx:nginx /etc/nginx/conf.d && \
+    chown -R nginx:nginx /usr/share/nginx/html && \
     touch /var/run/nginx.pid && \
     chown -R nginx:nginx /var/run/nginx.pid && \
-    chmod 644 /etc/nginx/conf.d/default.conf
+    chmod 644 /etc/nginx/nginx.conf
 
 # Switch to non-root user
 USER nginx
