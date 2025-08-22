@@ -129,7 +129,7 @@ const FormularioPermisos: React.FC<FormularioPermisosProps> = ({
 
   const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-  const [isDirty, setIsDirty] = useState<boolean>(false);
+  const [, setIsDirty] = useState<boolean>(false);
 
   const [loading, setLoading] = useState({
     submit: false,

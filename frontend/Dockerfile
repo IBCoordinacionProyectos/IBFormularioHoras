@@ -1,43 +1,61 @@
-# Etapa de construcción
-FROM node:18-slim AS build
+# =======================================
+# Build stage
+# =======================================
+FROM node:20-alpine AS builder
 
-# Establecer el directorio de trabajo
 WORKDIR /app
 
-# Variables de entorno para optimizar el build
-ENV CI=true \
-    GENERATE_SOURCEMAP=false
+# Set environment variables
+ENV NODE_ENV=production
+ENV NPM_CONFIG_LOGLEVEL=warn
+ENV NPM_CONFIG_PREFER_OFFLINE=true
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
+ENV NODE_OPTIONS=--max_old_space_size=4096
 
-# Copiar package.json e instalar dependencias
+# Install build dependencies
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++
+
+# Copy package files
 COPY package*.json ./
 
-# Instalar dependencias y react-scripts globalmente
-RUN npm install -g react-scripts && npm ci --legacy-peer-deps --unsafe-perm && chown -R node:node /app
+# Install dependencies
+RUN npm ci --omit=dev --prefer-offline --no-audit --progress=false
 
+# Copy source code
+COPY . .
 
-# Cambiar al usuario node para evitar problemas de permisos
-USER node
-
-# Copiar el resto del código fuente
-COPY --chown=node:node . .
-
-# Compilar la aplicación para producción
+# Build the application
 RUN npm run build
 
-# Etapa de producción
+# =======================================
+# Production stage
+# =======================================
 FROM nginx:stable-alpine
 
-# Limpiar contenido por defecto de nginx
+# Remove default nginx static assets
 RUN rm -rf /usr/share/nginx/html/*
 
-# Copiar la aplicación construida
-COPY --from=build /app/build/ /usr/share/nginx/html/
-
-# Copiar configuración personalizada de nginx
+# Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Exponer el puerto 80
+# Copy built assets from builder
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Set permissions
+RUN chown -R nginx:nginx /usr/share/nginx/html && \
+    chmod -R 755 /usr/share/nginx/html && \
+    chown -R nginx:nginx /var/cache/nginx && \
+    chown -R nginx:nginx /var/log/nginx && \
+    chown -R nginx:nginx /etc/nginx/conf.d
+
+# Switch to non-root user
+USER nginx
+
+# Expose port 80
 EXPOSE 80
 
-# Iniciar nginx
+# Start nginx
 CMD ["nginx", "-g", "daemon off;"]

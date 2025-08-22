@@ -23,7 +23,6 @@ import {
   Info,
   Undo2,
   Clock,
-  BarChart2,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -108,7 +107,7 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
   const [favorites, setFavorites] = useState<Favorite[]>([]);
 
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-  const [isDirty, setIsDirty] = useState<boolean>(false);
+  const [, setIsDirty] = useState<boolean>(false);
   const [loading, setLoading] = useState({
     submit: false,
     projects: true,

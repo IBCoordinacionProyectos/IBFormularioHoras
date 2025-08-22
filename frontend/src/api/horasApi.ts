@@ -1,5 +1,5 @@
 // src/api/horasApi.ts
-import axios, { AxiosResponse } from 'axios';
+import axios from 'axios';
 
 export const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'https://backend.yeisonduque.top';
 
@@ -34,8 +34,6 @@ export interface HourData {
 /* =========================
    Helpers
    ========================= */
-const normalizeHours = (h: number | string | undefined) =>
-  typeof h === 'string' ? parseFloat(h.replace(',', '.')) : (h ?? 0);
 
 // Para creación (POST) - incluye date
 const sanitizeCreate = (data: any) => ({
@@ -64,7 +62,6 @@ const sanitizeUpdate = (data: any) => {
   };
 };
 
-const encodeId = (id: string | number) => encodeURIComponent(String(id));
 
 /* =========================
    Crear/Actualizar (botón Guardar/Actualizar)

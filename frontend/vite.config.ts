@@ -107,18 +107,18 @@ export default defineConfig(({ mode, command }) => ({
   build: {
     outDir: 'dist',
     sourcemap: mode === 'development',
-    minify: 'esbuild',
-    cssMinify: true,
+    minify: mode === 'production' ? 'esbuild' : false,
     rollupOptions: {
       output: {
         manualChunks: {
           react: ['react', 'react-dom', 'react-router-dom'],
-          vendor: ['@supabase/supabase-js', 'date-fns', 'lucide-react']
+          vendor: ['@supabase/supabase-js', 'date-fns', 'framer-motion', '@emotion/react'],
+          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-popover'],
         },
-        entryFileNames: 'assets/[name].[hash].js',
-        chunkFileNames: 'assets/[name].[hash].js',
-        assetFileNames: 'assets/[name].[hash].[ext]'
-      }
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
+      },
     },
     chunkSizeWarningLimit: 1000,
     reportCompressedSize: false

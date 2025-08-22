@@ -16,9 +16,6 @@ const Header: React.FC<HeaderProps> = ({
   employeeName, 
   onLogout, 
   onShowPowerBI, 
-  onNavigateToHours, 
-  onNavigateToPermissions,
-  currentView = 'hours'
 }) => {
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
-import { BarChart2, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
+import { Card, CardContent } from './ui/card';
+import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 
 interface PowerBIPageProps {
   onBack: () => void;
@@ -14,14 +14,6 @@ const PowerBIPage: React.FC<PowerBIPageProps> = ({ onBack }) => {
   // URL pública del informe de Power BI
   const powerBIEmbedUrl = 'https://app.powerbi.com/view?r=eyJrIjoiMTI4YzgwOTItOTU5Mi00MGMxLWI4YzYtZjllZDgzNDdmZGNlIiwidCI6IjY5NjA3NDJlLTljMGYtNGI0OC1hYTVlLWJhMTYxY2IwMGViNiJ9';
   
-  // Configuración del iframe
-  const iframeStyle = {
-    width: '100%',
-    height: '100%',
-    border: 'none',
-    visibility: isLoading ? 'hidden' as const : 'visible' as const
-  };
-
   // Manejar la carga del iframe
   const handleIframeLoad = () => {
     setIsLoading(false);
