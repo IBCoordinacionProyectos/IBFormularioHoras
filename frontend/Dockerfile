@@ -1,17 +1,20 @@
-# Simplificando el Dockerfile para usar el servidor de desarrollo de Vite
-FROM node:20-alpine
+# Multi-stage build for production
+# Stage 1: Build the application
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Set environment variables
-ENV NODE_ENV=production
-ENV NPM_CONFIG_LOGLEVEL=warn
-ENV NPM_CONFIG_UPDATE_NOTIFIER=false
-ENV NODE_OPTIONS=--max_old_space_size=4096
+# Install build dependencies
+RUN apk add --no-cache python3 make g++
+
+# Copy package files
+COPY package*.json ./
 
 # Install dependencies
-COPY package*.json ./
 RUN npm ci --legacy-peer-deps
+
+# Install TypeScript globally
+RUN npm install -g typescript
 
 # Copy source code
 COPY . .
@@ -19,7 +22,22 @@ COPY . .
 # Build the app
 RUN npm run build
 
-# Expose port (puedes cambiarlo al puerto que prefieras)
+# Stage 2: Production image
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV NPM_CONFIG_LOGLEVEL=warn
+ENV NODE_OPTIONS=--max_old_space_size=4096
+
+# Copy built files from builder
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package*.json ./
+
+# Expose port
 EXPOSE 3000
 
 # Health check
