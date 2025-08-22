@@ -1,9 +1,19 @@
 import { defineConfig } from 'vite';
+import type { ConfigEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import viteCompression from 'vite-plugin-compression';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import path from 'path';
+
+// Extend the NodeJS namespace for process.env
+declare global {
+  namespace NodeJS {
+    interface ProcessEnv {
+      VITE_BACKEND_URL?: string;
+    }
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -12,7 +22,7 @@ const __dirname = dirname(__filename);
 // Security headers configuration
 function getSecurityHeaders(mode: string) {
   const backendUrl = process.env.VITE_BACKEND_URL || 'https://backend.yeisonduque.top';
-  const backendDomain = new URL(backendUrl).origin;
+  const backendDomain = backendUrl ? new URL(backendUrl).origin : '';
   
   return {
     'X-Content-Type-Options': 'nosniff',

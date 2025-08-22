@@ -1,7 +1,7 @@
 // src/api/horasApi.ts
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 
-export const API_BASE_URL = process.env.VITE_BACKEND_URL || 'https://backend.yeisonduque.top';
+export const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'https://backend.yeisonduque.top';
 
 /* =========================
    Tipos base (ajusta si quieres)
@@ -188,7 +188,7 @@ export const getDailyActivities = async (
 
   const res = await axios.get<DailyActivity[]>(`${API_BASE_URL}/daily-activities`, {
     params: { date: dateStr, employee_id: empId },
-    validateStatus: (s) => s >= 200 && s < 300,
+    validateStatus: (s: number) => s >= 200 && s < 300,
   });
   return res.data || [];
 };
