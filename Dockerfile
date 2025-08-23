@@ -1,5 +1,5 @@
 # 1. Base ligera de Python con pip incluido
-FROM python:3.11-slim AS base  
+FROM python:3.14-rc-alpine3.20 AS base  
 WORKDIR /app
 
 # 2. Variables de entorno
