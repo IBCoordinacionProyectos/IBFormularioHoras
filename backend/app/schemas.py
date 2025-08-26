@@ -70,6 +70,39 @@ class UserLogin(BaseModel):
     username: str
     password: str
 
+class ReportedPermissionBase(BaseModel):
+    date: date
+    employee_id: int
+    project_code: str
+    phase: str
+    discipline: str
+    activity: str
+    hours: float
+    note: str
+    status: str = "Pendiente"
+    response: Optional[str] = None
+
+class ReportedPermissionCreate(ReportedPermissionBase):
+    pass
+
+class ReportedPermissionUpdate(BaseModel):
+    date: Optional[date] = None
+    employee_id: Optional[int] = None
+    project_code: Optional[str] = None
+    phase: Optional[str] = None
+    discipline: Optional[str] = None
+    activity: Optional[str] = None
+    hours: Optional[float] = None
+    note: Optional[str] = None
+    status: Optional[str] = None
+    response: Optional[str] = None
+
+class ReportedPermission(ReportedPermissionBase):
+    id: int
+    created_at: date
+    updated_at: Optional[date] = None
+    model_config = ConfigDict(from_attributes=True)
+
 class LoginResponse(BaseModel):
     message: str
     employee_id: int

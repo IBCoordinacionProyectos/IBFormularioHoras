@@ -1,43 +1,58 @@
-# Etapa de construcción
-FROM node:18-slim AS build
-
-# Establecer el directorio de trabajo
+# =========================
+# Etapa de dependencias (instala TAMBIÉN devDependencies)
+# =========================
+FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Variables de entorno para optimizar el build
-ENV CI=true \
-    GENERATE_SOURCEMAP=false
+# Asegura que npm instale devDependencies (vite, plugin-react, etc.)
+ENV NPM_CONFIG_PRODUCTION=false
 
-# Copiar package.json e instalar dependencias
+# Archivos mínimos para resolver deps (mejora cache)
 COPY package*.json ./
+COPY tsconfig.json ./
+COPY tailwind.config.js ./
+COPY postcss.config.js ./
+COPY vite.config.ts ./
 
-# Instalar dependencias y react-scripts globalmente
-RUN npm install -g react-scripts && npm ci --legacy-peer-deps --unsafe-perm && chown -R node:node /app
+# Instala dependencias
+# (usa ci si tienes package-lock.json confiable; si no, cae a install)
+RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
+# 🔧 Rollup en Alpine necesita el binario MUSL; lo forzamos a la MISMA versión
+RUN ROLLUP_VERSION=$(node -p "require('./node_modules/rollup/package.json').version") \
+ && npm i -D @rollup/rollup-linux-x64-musl@${ROLLUP_VERSION} --no-save
 
-# Cambiar al usuario node para evitar problemas de permisos
-USER node
+# =========================
+# Etapa de build
+# =========================
+FROM node:20-alpine AS build
+WORKDIR /app
 
-# Copiar el resto del código fuente
-COPY --chown=node:node . .
+# Copiamos node_modules ya resueltos (con devDeps + rollup musl)
+COPY --from=deps /app/node_modules ./node_modules
 
-# Compilar la aplicación para producción
-RUN npm run build
+# Copiamos el resto del código
+COPY . .
 
-# Etapa de producción
-FROM nginx:stable-alpine
+# Permisos a binarios locales y verificación de vite
+RUN chmod +x node_modules/.bin/* \
+ && npx vite --version \
+ && npm run build
 
-# Limpiar contenido por defecto de nginx
-RUN rm -rf /usr/share/nginx/html/*
+# =========================
+# Etapa de producción (Nginx)
+# =========================
+FROM nginx:stable-alpine AS production
+WORKDIR /usr/share/nginx/html
 
-# Copiar la aplicación construida
-COPY --from=build /app/build/ /usr/share/nginx/html/
+# Limpiar contenido por defecto
+RUN rm -rf ./*
 
-# Copiar configuración personalizada de nginx
+# Copiar artefactos compilados
+COPY --from=build /app/dist ./
+
+# Configuración SPA (usa la tuya)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Exponer el puerto 80
 EXPOSE 80
-
-# Iniciar nginx
 CMD ["nginx", "-g", "daemon off;"]
