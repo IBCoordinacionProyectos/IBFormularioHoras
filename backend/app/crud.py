@@ -1,8 +1,8 @@
 # crud.py
 from .database import supabase
-from . import schemas
+from . import schemas, models
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 import logging
 
 logger = logging.getLogger(__name__)

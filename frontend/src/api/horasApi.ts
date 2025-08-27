@@ -196,6 +196,34 @@ export const getDailyActivities = async (
 /* =========================
    Auth (si lo usas)
    ========================= */
+export const submitPermission = async (data: any) => {
+  try {
+    const body = {
+      date: String(data.date ?? ''),
+      employee_id: String(data.employee_id ?? ''),
+      project_code: String(data.project_code ?? ''),
+      phase: String(data.phase ?? ''),
+      discipline: String(data.discipline ?? ''),
+      activity: String(data.activity ?? ''),
+      hours: String(data.hours ?? '0'),
+      note: String(data.note ?? ''),
+      employee: String(data.employee_name ?? '')
+    };
+    
+    console.log('Enviando permiso:', body);
+    const res = await axios.post(`${API_BASE_URL}/permissions/`, body);
+    return res.data;
+  } catch (error: any) {
+    console.error('Error al enviar el permiso:', error);
+    if (axios.isAxiosError(error) && error.response) {
+      console.error('Detalles del error (submitPermission):', error.response.data);
+      const detail = (error.response.data as any)?.detail ?? (error.response.data as any)?.message;
+      if (detail) throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+    }
+    throw error;
+  }
+};
+
 export const loginUser = async (credentials: any) => {
   const res = await axios.post(`${API_BASE_URL}/auth/login`, credentials);
   return res.data;
