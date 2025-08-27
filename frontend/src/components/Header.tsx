@@ -47,16 +47,15 @@ const Header: React.FC<HeaderProps> = ({
                 <span>Horas</span>
               </Button>
             </Link>
-            <Link to="/permisos" className="no-underline">
-              <Button 
+              <Button
                 variant={isActive('/permisos') ? 'default' : 'ghost'}
                 size="sm"
-                className={`h-8 px-3 ${isActive('/permisos') ? 'bg-primary hover:bg-primary/90' : 'text-white hover:bg-white/20'}`}
+                className={`h-8 px-3 ${isActive('/permisos') ? 'bg-primary hover:bg-primary/90' : 'text-white hover:bg-white/20'} opacity-50 cursor-not-allowed`}
+                disabled
               >
                 <FileClock className="h-4 w-4 mr-1" />
                 <span>Permisos</span>
               </Button>
-            </Link>
           </div>
         </div>
 
