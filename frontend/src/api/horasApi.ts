@@ -1,7 +1,7 @@
 // src/api/horasApi.ts
 import axios from 'axios';
 
-const API_BASE_URL = 'http://backend.yeisonduque.top';
+export const API_BASE_URL = 'http://backend.yeisonduque.top';
 
 /* =========================
    Tipos base (ajusta si quieres)
