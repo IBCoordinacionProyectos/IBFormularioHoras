@@ -14,6 +14,7 @@ origins = [
     "https://www.yeisonduque.top",
     "https://backend.yeisonduque.top",
     "http://horas.yeisonduque.top",
+    "https://horas.yeisonduque.top",
 ]
 
 app.add_middleware(
