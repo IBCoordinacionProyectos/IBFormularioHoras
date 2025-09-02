@@ -35,8 +35,7 @@ def login(user_credentials: schemas.UserLogin):
         )
 
     return {
-        "status": "success", 
-        "message": "Login successful", 
+        "message": "Login successful",
         "employee_id": db_user.get('id_members'),
         "employee_name": member['name']
     }
