@@ -344,140 +344,65 @@ def get_daily_activities(date: str, employee_id: int):
 
     return activities
 
-def get_monthly_hours_report(year: int, month: int):
-    """Devuelve un reporte de horas mensuales agrupadas por colaborador."""
-    logger.info("▶ get_monthly_hours_report | year=%s month=%s", year, month)
+
+def get_grouped_hours_by_employee(year: int, month: int):
+    """Fetch records from IB_Reported_Hours for a specific year and month, grouped by employee, summing hours per day."""
+    logger.info(f"▶ get_grouped_hours_by_employee | year={year} month={month}")
     
-    # Formatear las fechas para el rango del mes
+    # Calculate the start and end date for the given month
     from datetime import date
     import calendar
     
-    # Primer y último día del mes
     start_date = date(year, month, 1)
     last_day = calendar.monthrange(year, month)[1]
     end_date = date(year, month, last_day)
     
-    # 1. Traer todas las horas del mes
+    # 1. Fetch records from IB_Reported_Hours for the specific month
     hours_resp = (
         supabase
         .table("IB_Reported_Hours")
         .select("*")
         .gte("date", start_date.isoformat())
         .lte("date", end_date.isoformat())
-        .order("date", desc=False)
         .execute()
     )
     
     if not hours_resp.data:
-        logger.info("Sin registros de horas para el mes especificado")
+        logger.info("No records found in IB_Reported_Hours")
         return []
     
-    # 2. Obtener todos los empleados
+    # 2. Fetch all employees to get their short names
     employees_resp = supabase.table("IB_Members").select("id, name, short_name").execute()
     employees_map = {emp["id"]: {"name": emp["name"], "short_name": emp["short_name"]} for emp in employees_resp.data}
     
-    # 3. Procesar y agrupar los datos
-    monthly_report = []
+    # 3. Process and group the data
+    grouped_data = {}
+    
     for row in hours_resp.data:
-        # Convertir fecha string -> date para el esquema Pydantic
-        try:
-            row_date = datetime.fromisoformat(row["date"]).date()
-        except ValueError:
-            try:
-                row_date = datetime.strptime(row["date"], "%d/%m/%Y").date()
-            except ValueError:
-                row_date = None
-                
-        # Obtener información del empleado
-        employee_info = employees_map.get(row["employee_id"], {"name": f"Empleado {row['employee_id']}", "short_name": f"E{row['employee_id']}"})
+        # Extract date and employee_id
+        date = row.get("date")
+        employee_id = row.get("employee_id")
         
-        # Asegurarse de que las horas sean un número
-        hours = row.get("hours", 0)
-        if isinstance(hours, str):
+        # Convert employee_id to int for lookup if it's a string
+        employee_id_key = employee_id
+        if isinstance(employee_id, str):
             try:
-                hours = float(hours)
+                employee_id_key = int(employee_id)
             except ValueError:
-                hours = 0
-        elif not isinstance(hours, (int, float)):
-            hours = 0
+                # Skip records with invalid employee_id
+                continue
         
-        report_entry = {
-            **row,
-            "date": row_date,
-            "employee_name": employee_info["name"],
-            "employee_short_name": employee_info["short_name"],
-            "hours": hours
-        }
-        monthly_report.append(report_entry)
-    
-    return monthly_report
-
-def get_monthly_hours_matrix(year: int, month: int):
-    """Devuelve un reporte de horas mensuales en formato matriz (colaboradores x días)."""
-    logger.info("▶ get_monthly_hours_matrix | year=%s month=%s", year, month)
-    
-    # Formatear las fechas para el rango del mes
-    from datetime import date
-    import calendar
-    
-    # Primer y último día del mes
-    start_date = date(year, month, 1)
-    last_day = calendar.monthrange(year, month)[1]
-    end_date = date(year, month, last_day)
-    
-    # 1. Traer todas las horas del mes
-    hours_resp = (
-        supabase
-        .table("IB_Reported_Hours")
-        .select("*")
-        .gte("date", start_date.isoformat())
-        .lte("date", end_date.isoformat())
-        .order("date", desc=False)
-        .execute()
-    )
-    
-    if not hours_resp.data:
-        logger.info("Sin registros de horas para el mes especificado")
-        return {"employees": [], "days": [], "matrix": [], "totals": {"rows": [], "cols": []}}
-    
-    # 2. Obtener todos los empleados
-    employees_resp = supabase.table("IB_Members").select("id, name, short_name").execute()
-    employees_map = {emp["id"]: {"name": emp["name"], "short_name": emp["short_name"]} for emp in employees_resp.data}
-    
-    # 3. Crear estructura de días del mes
-    days_in_month = [date(year, month, day) for day in range(1, last_day + 1)]
-    days_str = [day.strftime("%Y-%m-%d") for day in days_in_month]
-    
-    # 4. Inicializar matriz de horas
-    employee_ids = list(employees_map.keys())
-    employee_names = [employees_map[emp_id]["name"] for emp_id in employee_ids]
-    employee_short_names = [employees_map[emp_id]["short_name"] for emp_id in employee_ids]
-    
-    # Crear diccionario para almacenar horas por empleado y día
-    hours_matrix = {}
-    for emp_id in employee_ids:
-        hours_matrix[emp_id] = {day: 0.0 for day in days_str}
-    
-    # 5. Llenar la matriz con los datos reales
-    for row in hours_resp.data:
-        # Convertir fecha string -> date para el esquema Pydantic
-        try:
-            row_date = datetime.fromisoformat(row["date"]).date()
-        except ValueError:
-            try:
-                row_date = datetime.strptime(row["date"], "%d/%m/%Y").date()
-            except ValueError:
-                row_date = None
-                
-        if row_date is None:
+        # Get employee info
+        employee_info = employees_map.get(employee_id_key)
+        
+        # Skip records with missing employee data
+        if not employee_info:
             continue
-            
-        date_str = row_date.strftime("%Y-%m-%d")
         
-        # Obtener información del empleado
-        employee_id = row["employee_id"]
+        # Create a unique key for grouping
+        key = (date, employee_id)
         
-        # Asegurarse de que las horas sean un número
+        # Convert hours to float
         hours = row.get("hours", 0)
         if isinstance(hours, str):
             try:
@@ -487,46 +412,19 @@ def get_monthly_hours_matrix(year: int, month: int):
         elif not isinstance(hours, (int, float)):
             hours = 0
         
-        # Agregar horas a la matriz
-        if employee_id in hours_matrix and date_str in hours_matrix[employee_id]:
-            hours_matrix[employee_id][date_str] += hours
+        # Add to grouped data
+        if key in grouped_data:
+            grouped_data[key]["hours"] += hours
+        else:
+            grouped_data[key] = {
+                "date": date,
+                "employee_id": str(employee_id),
+                "short_name": employee_info["short_name"],
+                "hours": hours
+            }
     
-    # 6. Convertir la matriz a formato de lista para la respuesta
-    matrix_data = []
-    row_totals = []
+    # 4. Convert to list format
+    result = list(grouped_data.values())
     
-    for i, emp_id in enumerate(employee_ids):
-        row_data = []
-        row_total = 0.0
-        
-        for day in days_str:
-            day_hours = hours_matrix[emp_id][day]
-            row_data.append(round(day_hours, 1))
-            row_total += day_hours
-            
-        matrix_data.append(row_data)
-        row_totals.append(round(row_total, 1))
-    
-    # 7. Calcular totales por columna (día)
-    col_totals = []
-    for j, day in enumerate(days_str):
-        col_total = 0.0
-        for i, emp_id in enumerate(employee_ids):
-            col_total += hours_matrix[emp_id][day]
-        col_totals.append(round(col_total, 1))
-    
-    # 8. Formatear días para mostrar
-    days_formatted = [day.split("-")[2] for day in days_str]  # Solo el número del día
-    
-    return {
-        "employees": [
-            {"id": emp_id, "name": employee_names[i], "short_name": employee_short_names[i]}
-            for i, emp_id in enumerate(employee_ids)
-        ],
-        "days": days_formatted,
-        "matrix": matrix_data,
-        "totals": {
-            "rows": row_totals,
-            "cols": col_totals
-        }
-    }
+    logger.info(f"Grouped hours by employee: {len(result)} records")
+    return result

@@ -4,7 +4,7 @@ import { es } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { ChevronLeft, Calendar } from 'lucide-react';
-import { getMonthlyHoursMatrix } from '../api/horasApi';
+import { getGroupedHoursByEmployee } from '../api/horasApi';
 
 interface Employee {
   id: number;
@@ -12,7 +12,14 @@ interface Employee {
   short_name: string;
 }
 
-interface MonthlyMatrixData {
+interface GroupedHour {
+  date: string;
+  employee_id: string;
+  short_name: string;
+  hours: number;
+}
+
+interface TransformedData {
   employees: Employee[];
   days: string[];
   matrix: number[][];
@@ -24,9 +31,70 @@ interface MonthlyMatrixData {
 
 const TablaHoras: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
-  const [matrixData, setMatrixData] = useState<MonthlyMatrixData | null>(null);
+  const [matrixData, setMatrixData] = useState<TransformedData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Transform grouped data to matrix format
+  const transformGroupedData = (groupedData: GroupedHour[]): TransformedData => {
+    // Extract unique employees and days
+    const employeesMap = new Map<string, { id: number; name: string; short_name: string }>();
+    const daysSet = new Set<string>();
+    
+    groupedData.forEach(item => {
+      // Add employee to map
+      const employeeId = parseInt(item.employee_id, 10);
+      if (!employeesMap.has(item.employee_id)) {
+        employeesMap.set(item.employee_id, {
+          id: employeeId,
+          name: item.short_name, // Using short_name as name for display
+          short_name: item.short_name
+        });
+      }
+      
+      // Add day to set
+      daysSet.add(item.date);
+    });
+    
+    // Convert to arrays and sort
+    const employees = Array.from(employeesMap.values()).sort((a, b) => a.short_name.localeCompare(b.short_name));
+    const days = Array.from(daysSet).sort();
+    
+    // Create matrix
+    const matrix: number[][] = [];
+    const rowTotals: number[] = [];
+    const colTotals: number[] = Array(days.length).fill(0);
+    
+    employees.forEach((employee, rowIndex) => {
+      const row: number[] = Array(days.length).fill(0);
+      let rowTotal = 0;
+      
+      days.forEach((day, colIndex) => {
+        const matchingItem = groupedData.find(
+          item => item.employee_id === employee.id.toString() && item.date === day
+        );
+        
+        if (matchingItem) {
+          row[colIndex] = matchingItem.hours;
+          rowTotal += matchingItem.hours;
+          colTotals[colIndex] += matchingItem.hours;
+        }
+      });
+      
+      matrix.push(row);
+      rowTotals.push(rowTotal);
+    });
+    
+    return {
+      employees,
+      days,
+      matrix,
+      totals: {
+        rows: rowTotals,
+        cols: colTotals
+      }
+    };
+  };
 
   // Fetch matrix data for the current month
   useEffect(() => {
@@ -38,9 +106,10 @@ const TablaHoras: React.FC = () => {
         const year = currentMonth.getFullYear();
         const month = currentMonth.getMonth() + 1; // getMonth() is zero-indexed
         
-        const data = await getMonthlyHoursMatrix(year, month);
+        const groupedData = await getGroupedHoursByEmployee(year, month);
+        const transformedData = transformGroupedData(groupedData);
         
-        setMatrixData(data);
+        setMatrixData(transformedData);
       } catch (err: any) {
         console.error('Error fetching matrix data:', err);
         setError(err.message || 'Error al cargar el reporte de horas');
@@ -110,16 +179,23 @@ const TablaHoras: React.FC = () => {
     );
   }
 
-  // If we have data, render the matrix table
-  if (matrixData) {
-    const { employees, days, matrix, totals } = matrixData;
-    
-    // Get the number of days in the month for proper column count
-    const daysInMonth = getDaysInMonth(currentMonth);
-    
-    return (
-      <Card>
-        <CardHeader>
+   // If we have data, render the matrix table
+   if (matrixData) {
+     const { employees, days, matrix, totals } = matrixData;
+     
+     // Filter out days where no collaborator has hours
+     const daysWithHours = days.filter((_, index) => totals.cols[index] > 0);
+     const filteredMatrix = matrix.map(row =>
+       row.filter((_, colIndex) => totals.cols[colIndex] > 0)
+     );
+     const filteredTotalsCols = totals.cols.filter(total => total > 0);
+     
+     // Get the number of days in the month for proper column count
+     const daysInMonth = getDaysInMonth(currentMonth);
+     
+     return (
+       <Card>
+         <CardHeader>
           <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
@@ -153,7 +229,7 @@ const TablaHoras: React.FC = () => {
                 <thead>
                   <tr>
                     <th className="border p-2 text-left bg-gray-100 sticky left-0 z-10">Colaborador</th>
-                    {days.map((day, index) => (
+                    {daysWithHours.map((day, index) => (
                       <th key={index} className="border p-2 text-center bg-gray-100">
                         {day}
                       </th>
@@ -165,9 +241,9 @@ const TablaHoras: React.FC = () => {
                   {employees.map((employee, rowIndex) => (
                     <tr key={employee.id} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="border p-2 font-medium sticky left-0 z-10 bg-inherit">
-                        {employee.name}
+                        {employee.short_name}
                       </td>
-                      {matrix[rowIndex]?.map((hours, colIndex) => (
+                      {filteredMatrix[rowIndex]?.map((hours, colIndex) => (
                         <td key={colIndex} className="border p-2 text-center">
                           {hours > 0 ? hours.toFixed(1) : ''}
                         </td>
@@ -181,7 +257,7 @@ const TablaHoras: React.FC = () => {
                 <tfoot>
                   <tr className="bg-gray-200 font-bold">
                     <td className="border p-2 text-right">Total</td>
-                    {totals.cols.map((total, index) => (
+                    {filteredTotalsCols.map((total, index) => (
                       <td key={index} className="border p-2 text-center">
                         {total.toFixed(1)}
                       </td>

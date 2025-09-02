@@ -74,3 +74,10 @@ class LoginResponse(BaseModel):
     message: str
     employee_id: int
     employee_name: str
+
+class GroupedHour(BaseModel):
+    date: str
+    employee_id: str
+    short_name: str
+    hours: float
+    model_config = ConfigDict(from_attributes=True)

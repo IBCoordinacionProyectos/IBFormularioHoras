@@ -261,3 +261,27 @@ export const getMonthlyHoursMatrix = async (year: number, month: number): Promis
     throw error;
   }
 };
+
+export interface GroupedHour {
+  date: string;
+  employee_id: string;
+  short_name: string;
+  hours: number;
+}
+
+export const getGroupedHoursByEmployee = async (year: number, month: number): Promise<GroupedHour[]> => {
+  try {
+    const res = await axios.get<GroupedHour[]>(`${API_BASE_URL}/hours/grouped-by-employee`, {
+      params: { year, month }
+    });
+    return res.data || [];
+  } catch (error: any) {
+    console.error(`Error al obtener las horas agrupadas por empleado para ${year}-${month}:`, error);
+    if (axios.isAxiosError(error) && error.response) {
+      console.error('Detalles del error (getGroupedHoursByEmployee):', error.response.data);
+      const detail = (error.response.data as any)?.detail ?? (error.response.data as any)?.message;
+      if (detail) throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+    }
+    throw error;
+  }
+};

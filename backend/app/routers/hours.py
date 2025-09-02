@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 import logging
 logging.basicConfig(level=logging.DEBUG)
 from .. import crud
-from ..schemas import ReportedHourCreate, ReportedHourUpdate, ReportedHour
+from ..schemas import ReportedHourCreate, ReportedHourUpdate, ReportedHour, GroupedHour
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -44,24 +44,14 @@ def delete_hour(hour_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error interno al eliminar: {str(e)}")
 
-@router.get("/monthly-report/{year}/{month}")
-def get_monthly_hours_report(year: int, month: int):
-    logger.info(f"--- Solicitando reporte mensual de horas para año: {year}, mes: {month} ---")
-    try:
-        report_data = crud.get_monthly_hours_report(year, month)
-        logger.info(f"Reporte mensual generado exitosamente para {year}-{month}.")
-        return report_data
-    except Exception as e:
-        logger.error(f"Excepción inesperada al generar reporte mensual para {year}-{month}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error interno al generar reporte: {str(e)}")
 
-@router.get("/monthly-matrix/{year}/{month}")
-def get_monthly_hours_matrix(year: int, month: int):
-    logger.info(f"--- Solicitando reporte mensual de horas en formato matriz para año: {year}, mes: {month} ---")
+@router.get("/grouped-by-employee", response_model=list[GroupedHour])
+def get_grouped_hours_by_employee(year: int, month: int):
+    logger.info(f"▶ get_grouped_hours_by_employee | year={year} month={month}")
     try:
-        matrix_data = crud.get_monthly_hours_matrix(year, month)
-        logger.info(f"Reporte mensual en formato matriz generado exitosamente para {year}-{month}.")
-        return matrix_data
+        grouped_data = crud.get_grouped_hours_by_employee(year, month)
+        logger.info(f"Grouped hours by employee: {len(grouped_data)} records")
+        return grouped_data
     except Exception as e:
-        logger.error(f"Excepción inesperada al generar reporte mensual en formato matriz para {year}-{month}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error interno al generar reporte: {str(e)}")
+        logger.error(f"Excepción inesperada al obtener horas agrupadas por empleado", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error interno al obtener horas agrupadas: {str(e)}")
