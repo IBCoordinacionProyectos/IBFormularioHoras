@@ -50,26 +50,26 @@ def validate_project_code(project_code: str) -> str:
 def validate_phase_discipline_activity(value: str, field_name: str) -> str:
     """
     Validate and sanitize phase, discipline, or activity fields.
-    
+
     Args:
         value: The value to validate
         field_name: Name of the field for error messages
-        
+
     Returns:
         Validated value
-        
+
     Raises:
         ValueError: If value is invalid
     """
     if not isinstance(value, str):
         raise ValueError(f"{field_name} must be a string")
-    
+
     sanitized = sanitize_string(value, 200)
-    
-    # Allow alphanumeric characters, spaces, hyphens, underscores, parentheses, and accented characters
-    if not re.match(r'^[A-Za-z0-9\s\-_()ÁÉÍÓÚáéíóúÑñ]+$', sanitized):
+
+    # Allow alphanumeric characters, spaces, hyphens, underscores, parentheses, forward slashes, and accented characters
+    if not re.match(r'^[A-Za-z0-9\s\-_()/ÁÉÍÓÚáéíóúÑñ]+$', sanitized):
         raise ValueError(f"{field_name} contains invalid characters")
-    
+
     return sanitized
 
 def validate_hours(hours: Union[str, float, int]) -> float:
