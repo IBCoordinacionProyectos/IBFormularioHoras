@@ -19,8 +19,16 @@ async def login(user_credentials: schemas.UserLogin, request: Request):
     try:
         # Log the login attempt
         logger.info(f"Login attempt for username: {user_credentials.username}")
-        
-        db_user = crud.get_user_by_username(username=user_credentials.username)
+
+        # Get user from database
+        try:
+            db_user = crud.get_user_by_username(username=user_credentials.username)
+        except Exception as db_e:
+            logger.error(f"Database error getting user {user_credentials.username}: {db_e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database error",
+            )
 
         if not db_user:
             logger.warning(f"User not found: {user_credentials.username}")
@@ -38,13 +46,54 @@ async def login(user_credentials: schemas.UserLogin, request: Request):
                 detail="Incorrect username or password",
             )
 
-        # Verify password using passlib
-        if not pwd_context.verify(user_credentials.password, user_password):
+        # Verify password - handle both hashed and plain text passwords
+        password_valid = False
+        try:
+            # First try to verify as a bcrypt hash
+            password_valid = pwd_context.verify(user_credentials.password, user_password)
+        except Exception as pwd_e:
+            # If that fails, check if it's a plain text password
+            if str(pwd_e) == "hash could not be identified":
+                # Plain text comparison
+                password_valid = user_credentials.password == user_password
+                if password_valid:
+                    logger.info(f"User {user_credentials.username} is using plain text password - should be migrated to hashed")
+            else:
+                logger.error(f"Password verification error for user {user_credentials.username}: {pwd_e}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Incorrect username or password",
+                )
+
+        if not password_valid:
             logger.warning(f"Invalid password for user: {user_credentials.username}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Incorrect username or password",
             )
+
+        # If password was plain text, hash it for future use
+        if user_password == user_credentials.password:
+            logger.info(f"Migrating plain text password to hash for user: {user_credentials.username}")
+            # Note: In a production environment, you would update the database here
+            # For now, we're just logging that migration is needed
+            # In a real implementation, you would:
+            # 1. Hash the password
+            # 2. Update the database record
+            # hashed_password = pwd_context.hash(user_credentials.password)
+            # supabase.table("IB_Authentication").update({"password": hashed_password}).eq("user", user_credentials.username).execute()
+        # If password was plain text, hash it for future use
+        if user_password == user_credentials.password:
+            logger.info(f"Migrating plain text password to hash for user: {user_credentials.username}")
+            # Hash the password
+            hashed_password = pwd_context.hash(user_credentials.password)
+            # Update database with hashed_password
+            try:
+                crud.update_user_password(user_credentials.username, hashed_password)
+                logger.info(f"Successfully migrated password for user: {user_credentials.username}")
+            except Exception as e:
+                logger.error(f"Failed to update password for user {user_credentials.username}: {e}", exc_info=True)
+
 
         # Check if id_members exists and is not None
         member_id = db_user.get('id_members')
@@ -55,7 +104,16 @@ async def login(user_credentials: schemas.UserLogin, request: Request):
                 detail="Empleado no encontrado",
             )
 
-        member = crud.get_member_by_id(member_id=member_id)
+        # Get member from database
+        try:
+            member = crud.get_member_by_id(member_id=member_id)
+        except Exception as member_e:
+            logger.error(f"Database error getting member {member_id} for user {user_credentials.username}: {member_e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database error",
+            )
+
         if not member:
             logger.error(f"Member not found for user: {user_credentials.username} with member_id: {member_id}")
             raise HTTPException(

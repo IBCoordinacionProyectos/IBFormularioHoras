@@ -466,3 +466,18 @@ def get_grouped_hours_by_employee(year: int, month: int):
     
     logger.info(f"Grouped hours by employee: {len(result)} records")
     return result
+
+def update_user_password(username: str, new_password_hash: str):
+    """Update a user's password hash in the database"""
+    try:
+        response = (
+            supabase
+            .table("IB_Authentication")
+            .update({"password": new_password_hash})
+            .eq("user", username)
+            .execute()
+        )
+        return response.data
+    except Exception as e:
+        logger.error(f"Error updating password for user {username}: {e}", exc_info=True)
+        raise
