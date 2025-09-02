@@ -29,17 +29,35 @@ async def login(user_credentials: schemas.UserLogin, request: Request):
                 detail="Incorrect username or password",
             )
 
+        # Check if password field exists and is not None
+        user_password = db_user.get('password')
+        if user_password is None:
+            logger.warning(f"Password is None for user: {user_credentials.username}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Incorrect username or password",
+            )
+
         # Verify password using passlib
-        if not pwd_context.verify(user_credentials.password, db_user.get('password')):
+        if not pwd_context.verify(user_credentials.password, user_password):
             logger.warning(f"Invalid password for user: {user_credentials.username}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Incorrect username or password",
             )
 
-        member = crud.get_member_by_id(member_id=db_user.get('id_members'))
+        # Check if id_members exists and is not None
+        member_id = db_user.get('id_members')
+        if member_id is None:
+            logger.error(f"id_members is None for user: {user_credentials.username}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Empleado no encontrado",
+            )
+
+        member = crud.get_member_by_id(member_id=member_id)
         if not member:
-            logger.error(f"Member not found for user: {user_credentials.username} with member_id: {db_user.get('id_members')}")
+            logger.error(f"Member not found for user: {user_credentials.username} with member_id: {member_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Empleado no encontrado",
