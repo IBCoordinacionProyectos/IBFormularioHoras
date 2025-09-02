@@ -179,9 +179,13 @@ def get_activity_id(project_code: str, phase: str, discipline: str, activity: st
     else:
         discipline_variations = [discipline]
     
+    # Limpiar el nombre de la actividad
+    clean_activity = activity.strip()
+    
     # Intentar con cada variación de disciplina
     response = None
     for variation in discipline_variations:
+        # 1. Búsqueda exacta primero
         response = (
             supabase
             .table("IB_Activities")
@@ -189,21 +193,47 @@ def get_activity_id(project_code: str, phase: str, discipline: str, activity: st
             .eq("project_code", project_code)
             .eq("phase", phase)
             .eq("discipline", variation)
-            .eq("activity", activity)
+            .eq("activity", clean_activity)
             .execute()
         )
         
         if response.data:
             break
             
-        # Búsqueda insensible a mayúsculas/minúsculas y espacios
+        # 2. Búsqueda insensible a mayúsculas/minúsculas y espacios para la disciplina
         if not response.data:
             response = supabase.table("IB_Activities") \
                 .select("activity_id") \
                 .eq("project_code", project_code) \
                 .eq("phase", phase) \
                 .ilike("discipline", f"%{variation.strip()}%") \
-                .eq("activity", activity) \
+                .eq("activity", clean_activity) \
+                .execute()
+            
+            if response.data:
+                break
+        
+        # 3. Búsqueda insensible a mayúsculas/minúsculas y espacios para la actividad
+        if not response.data:
+            response = supabase.table("IB_Activities") \
+                .select("activity_id") \
+                .eq("project_code", project_code) \
+                .eq("phase", phase) \
+                .eq("discipline", variation) \
+                .ilike("activity", f"%{clean_activity}%") \
+                .execute()
+            
+            if response.data:
+                break
+                
+        # 4. Búsqueda insensible a mayúsculas/minúsculas y espacios para ambos
+        if not response.data:
+            response = supabase.table("IB_Activities") \
+                .select("activity_id") \
+                .eq("project_code", project_code) \
+                .eq("phase", phase) \
+                .ilike("discipline", f"%{variation.strip()}%") \
+                .ilike("activity", f"%{clean_activity}%") \
                 .execute()
             
             if response.data:
@@ -211,15 +241,25 @@ def get_activity_id(project_code: str, phase: str, discipline: str, activity: st
     
     # Si aún no hay resultados, intentar una búsqueda más amplia
     if not response or not response.data:
+        # Buscar todas las actividades que coincidan parcialmente
         response = supabase.table("IB_Activities") \
-            .select("activity_id") \
+            .select("activity_id, activity") \
             .eq("project_code", project_code) \
             .eq("phase", phase) \
             .ilike("discipline", "%N/A%") \
-            .eq("activity", activity) \
+            .ilike("activity", f"%{clean_activity}%") \
             .execute()
+        
+        # Si encontramos coincidencias parciales, mostrarlas en el mensaje de error
+        if response.data:
+            activities_found = [item["activity"] for item in response.data]
+            raise ValueError(
+                f"No se encontró la actividad exacta: {activity} en la fase '{phase}' "
+                f"y disciplina '{discipline}' del proyecto '{project_code}'. "
+                f"Actividades similares encontradas: {', '.join(activities_found[:5])}"
+            )
     
-    if not response.data:
+    if not response or not response.data:
         raise ValueError(
             f"No se encontró la actividad: {activity} en la fase '{phase}' "
             f"y disciplina '{discipline}' del proyecto '{project_code}'."
