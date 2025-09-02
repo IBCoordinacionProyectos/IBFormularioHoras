@@ -54,3 +54,14 @@ def get_monthly_hours_report(year: int, month: int):
     except Exception as e:
         logger.error(f"Excepción inesperada al generar reporte mensual para {year}-{month}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error interno al generar reporte: {str(e)}")
+
+@router.get("/monthly-matrix/{year}/{month}")
+def get_monthly_hours_matrix(year: int, month: int):
+    logger.info(f"--- Solicitando reporte mensual de horas en formato matriz para año: {year}, mes: {month} ---")
+    try:
+        matrix_data = crud.get_monthly_hours_matrix(year, month)
+        logger.info(f"Reporte mensual en formato matriz generado exitosamente para {year}-{month}.")
+        return matrix_data
+    except Exception as e:
+        logger.error(f"Excepción inesperada al generar reporte mensual en formato matriz para {year}-{month}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error interno al generar reporte: {str(e)}")

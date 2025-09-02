@@ -1,34 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth, getDaysInMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { ChevronLeft, Calendar } from 'lucide-react';
-import { getMonthlyHoursReport } from '../api/horasApi';
+import { getMonthlyHoursMatrix } from '../api/horasApi';
 
-interface ReportedHour {
-  id: string;
-  date: string;
-  employee_id: number;
-  employee_name: string;
-  employee_short_name: string;
-  project_code: string;
-  phase: string;
-  discipline: string;
-  activity: string;
-  hours: number;
-  note?: string | null;
+interface Employee {
+  id: number;
+  name: string;
+  short_name: string;
+}
+
+interface MonthlyMatrixData {
+  employees: Employee[];
+  days: string[];
+  matrix: number[][];
+  totals: {
+    rows: number[];
+    cols: number[];
+  };
 }
 
 const TablaHoras: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
-  const [reportedHours, setReportedHours] = useState<ReportedHour[]>([]);
+  const [matrixData, setMatrixData] = useState<MonthlyMatrixData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch reported hours for the current month
+  // Fetch matrix data for the current month
   useEffect(() => {
-    const fetchReportedHours = async () => {
+    const fetchMatrixData = async () => {
       setLoading(true);
       setError(null);
       
@@ -36,18 +38,18 @@ const TablaHoras: React.FC = () => {
         const year = currentMonth.getFullYear();
         const month = currentMonth.getMonth() + 1; // getMonth() is zero-indexed
         
-        const data = await getMonthlyHoursReport(year, month);
+        const data = await getMonthlyHoursMatrix(year, month);
         
-        setReportedHours(data || []);
+        setMatrixData(data);
       } catch (err: any) {
-        console.error('Error fetching reported hours:', err);
-        setError(err.message || 'Error al cargar las horas reportadas');
+        console.error('Error fetching matrix data:', err);
+        setError(err.message || 'Error al cargar el reporte de horas');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchReportedHours();
+    fetchMatrixData();
   }, [currentMonth]);
 
   const handlePreviousMonth = () => {
@@ -108,82 +110,115 @@ const TablaHoras: React.FC = () => {
     );
   }
 
+  // If we have data, render the matrix table
+  if (matrixData) {
+    const { employees, days, matrix, totals } = matrixData;
+    
+    // Get the number of days in the month for proper column count
+    const daysInMonth = getDaysInMonth(currentMonth);
+    
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              <span>Reporte de Horas - {format(currentMonth, 'MMMM yyyy', { locale: es })}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handlePreviousMonth}>
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Mes Anterior
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleCurrentMonth}
+                disabled={currentMonth.getMonth() === new Date().getMonth() && 
+                         currentMonth.getFullYear() === new Date().getFullYear()}
+              >
+                Mes Actual
+              </Button>
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {employees.length === 0 ? (
+            <div className="flex items-center justify-center h-32">
+              <p>No hay datos para el mes seleccionado.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr>
+                    <th className="border p-2 text-left bg-gray-100 sticky left-0 z-10">Colaborador</th>
+                    {days.map((day, index) => (
+                      <th key={index} className="border p-2 text-center bg-gray-100">
+                        {day}
+                      </th>
+                    ))}
+                    <th className="border p-2 text-center bg-gray-200">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {employees.map((employee, rowIndex) => (
+                    <tr key={employee.id} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="border p-2 font-medium sticky left-0 z-10 bg-inherit">
+                        {employee.name}
+                      </td>
+                      {matrix[rowIndex]?.map((hours, colIndex) => (
+                        <td key={colIndex} className="border p-2 text-center">
+                          {hours > 0 ? hours.toFixed(1) : ''}
+                        </td>
+                      ))}
+                      <td className="border p-2 text-center font-bold bg-gray-100">
+                        {totals.rows[rowIndex]?.toFixed(1) || '0.0'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-gray-200 font-bold">
+                    <td className="border p-2 text-right">Total</td>
+                    {totals.cols.map((total, index) => (
+                      <td key={index} className="border p-2 text-center">
+                        {total.toFixed(1)}
+                      </td>
+                    ))}
+                    <td className="border p-2 text-center">
+                      {totals.rows.reduce((sum, rowTotal) => sum + rowTotal, 0).toFixed(1)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Fallback in case we have no data and no error
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            <span>Reporte de Horas - {format(currentMonth, 'MMMM yyyy', { locale: es })}</span>
-          </div>
+        <CardTitle className="flex items-center justify-between">
+          <span>Reporte de Horas</span>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handlePreviousMonth}>
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Mes Anterior
+              <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleCurrentMonth}
-              disabled={currentMonth.getMonth() === new Date().getMonth() && 
-                       currentMonth.getFullYear() === new Date().getFullYear()}
-            >
+            <Button variant="outline" size="sm" onClick={handleCurrentMonth}>
               Mes Actual
             </Button>
           </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {reportedHours.length === 0 ? (
-          <div className="flex items-center justify-center h-32">
-            <p>No hay datos para el mes seleccionado.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-4 font-medium">Fecha</th>
-                  <th className="text-left py-3 px-4 font-medium">Empleado</th>
-                  <th className="text-left py-3 px-4 font-medium">Proyecto</th>
-                  <th className="text-left py-3 px-4 font-medium">Actividad</th>
-                  <th className="text-right py-3 px-4 font-medium">Horas</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reportedHours.map((hour) => (
-                  <tr key={hour.id} className="border-b hover:bg-muted/50">
-                    <td className="py-3 px-4">
-                      {format(new Date(hour.date), 'dd/MM/yyyy')}
-                    </td>
-                    <td className="py-3 px-4">
-                      {hour.employee_name}
-                    </td>
-                    <td className="py-3 px-4">
-                      {hour.project_code}
-                    </td>
-                    <td className="py-3 px-4">
-                      {hour.activity}
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      {hour.hours.toFixed(1)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t font-medium">
-                  <td colSpan={4} className="py-3 px-4 text-right">
-                    Total Horas:
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    {reportedHours.reduce((sum, hour) => sum + hour.hours, 0).toFixed(1)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        )}
+        <div className="flex items-center justify-center h-32">
+          <p>No hay datos disponibles.</p>
+        </div>
       </CardContent>
     </Card>
   );

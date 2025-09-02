@@ -232,3 +232,32 @@ export const getMonthlyHoursReport = async (year: number, month: number): Promis
     throw error;
   }
 };
+
+export interface MonthlyMatrixData {
+  employees: Array<{
+    id: number;
+    name: string;
+    short_name: string;
+  }>;
+  days: string[];
+  matrix: number[][];
+  totals: {
+    rows: number[];
+    cols: number[];
+  };
+}
+
+export const getMonthlyHoursMatrix = async (year: number, month: number): Promise<MonthlyMatrixData> => {
+  try {
+    const res = await axios.get<MonthlyMatrixData>(`${API_BASE_URL}/hours/monthly-matrix/${year}/${month}`);
+    return res.data || { employees: [], days: [], matrix: [], totals: { rows: [], cols: [] } };
+  } catch (error: any) {
+    console.error(`Error al obtener el reporte mensual de horas en formato matriz para ${year}-${month}:`, error);
+    if (axios.isAxiosError(error) && error.response) {
+      console.error('Detalles del error (getMonthlyHoursMatrix):', error.response.data);
+      const detail = (error.response.data as any)?.detail ?? (error.response.data as any)?.message;
+      if (detail) throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+    }
+    throw error;
+  }
+};

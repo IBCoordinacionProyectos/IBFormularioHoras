@@ -33,7 +33,7 @@ import { Calendar } from './ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import { cn } from '../lib/utils';
-import { Dialog, DialogContent, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 
 import { FormSelect } from './formulario/FormSelect';
 import { ActivityItem } from './formulario/ActivityItem';
@@ -807,6 +807,12 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Reporte de Horas</DialogTitle>
+                      <DialogDescription>
+                        Visualiza el reporte de horas registradas por mes.
+                      </DialogDescription>
+                    </DialogHeader>
                     <TablaHoras />
                   </DialogContent>
                 </Dialog>
