@@ -75,8 +75,9 @@ const validateInput = (input: any, type: string, maxLength: number = 1000): stri
     case 'phase':
     case 'discipline':
     case 'activity':
-      // Allow letters, numbers, spaces, hyphens, underscores, parentheses, forward slashes, and accented characters
-      if (!/^[A-Za-z0-9\s\-_()/ÁÉÍÓÚáéíóúÑñ]+$/i.test(str)) {
+      // Allow letters, numbers, spaces, hyphens, underscores, parentheses, forward slashes,
+      // commas, periods, colons, semicolons, question marks, exclamation marks, quotes, and accented characters
+      if (!/^[A-Za-z0-9\s\-_()/,.:;?!"'ÁÉÍÓÚáéíóúÑñüÜ]+$/i.test(str)) {
         throw new Error(`${type} contains invalid characters`);
       }
       break;

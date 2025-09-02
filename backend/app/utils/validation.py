@@ -66,8 +66,9 @@ def validate_phase_discipline_activity(value: str, field_name: str) -> str:
 
     sanitized = sanitize_string(value, 200)
 
-    # Allow alphanumeric characters, spaces, hyphens, underscores, parentheses, forward slashes, and accented characters
-    if not re.match(r'^[A-Za-z0-9\s\-_()/ÁÉÍÓÚáéíóúÑñ]+$', sanitized):
+    # Allow alphanumeric characters, spaces, hyphens, underscores, parentheses, forward slashes,
+    # commas, periods, colons, semicolons, question marks, exclamation marks, quotes, and accented characters
+    if not re.match(r'^[A-Za-z0-9\s\-_()/,.:;?!"\'ÁÉÍÓÚáéíóúÑñüÜ]+$', sanitized):
         raise ValueError(f"{field_name} contains invalid characters")
 
     return sanitized
