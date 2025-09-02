@@ -5,6 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { ChevronLeft, Calendar } from 'lucide-react';
 import { getGroupedHoursByEmployee } from '../api/horasApi';
+import {
+  Table,
+  TableBody,
+  TableFooter,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from './ui/table';
 
 interface Employee {
   id: number;
@@ -32,7 +41,7 @@ interface TransformedData {
 const TablaHoras: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [matrixData, setMatrixData] = useState<TransformedData | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   // Transform grouped data to matrix format
@@ -134,13 +143,13 @@ const TablaHoras: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Reporte de Horas</span>
+            <span>{format(currentMonth, 'MMMM yyyy', { locale: es })}</span>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={handlePreviousMonth}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <Button variant="outline" size="sm" onClick={handleCurrentMonth}>
-                Mes Actual
+                <ChevronLeft className="h-4 w-4 rotate-180" />
               </Button>
             </div>
           </CardTitle>
@@ -159,13 +168,13 @@ const TablaHoras: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Reporte de Horas</span>
+            <span>{format(currentMonth, 'MMMM yyyy', { locale: es })}</span>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={handlePreviousMonth}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <Button variant="outline" size="sm" onClick={handleCurrentMonth}>
-                Mes Actual
+                <ChevronLeft className="h-4 w-4 rotate-180" />
               </Button>
             </div>
           </CardTitle>
@@ -199,21 +208,20 @@ const TablaHoras: React.FC = () => {
           <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              <span>Reporte de Horas - {format(currentMonth, 'MMMM yyyy', { locale: es })}</span>
+              <span>{format(currentMonth, 'MMMM yyyy', { locale: es })}</span>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={handlePreviousMonth}>
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Mes Anterior
+                <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleCurrentMonth}
-                disabled={currentMonth.getMonth() === new Date().getMonth() && 
+                disabled={currentMonth.getMonth() === new Date().getMonth() &&
                          currentMonth.getFullYear() === new Date().getFullYear()}
               >
-                Mes Actual
+                <ChevronLeft className="h-4 w-4 rotate-180" />
               </Button>
             </div>
           </CardTitle>
@@ -225,49 +233,49 @@ const TablaHoras: React.FC = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr>
-                    <th className="border p-2 text-left bg-gray-100 sticky left-0 z-10">Colaborador</th>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-black font-bold sticky left-0 z-10 p-2">Colaborador</TableHead>
                     {daysWithHours.map((day, index) => (
-                      <th key={index} className="border p-2 text-center bg-gray-100">
-                        {day}
-                      </th>
+                      <TableHead key={index} className="text-black font-bold text-center p-2">
+                        {parseInt(day.split('-')[2], 10)}
+                      </TableHead>
                     ))}
-                    <th className="border p-2 text-center bg-gray-200">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
+                    <TableHead className="text-black font-bold text-center p-2">Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {employees.map((employee, rowIndex) => (
-                    <tr key={employee.id} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="border p-2 font-medium sticky left-0 z-10 bg-inherit">
+                    <TableRow key={employee.id}>
+                      <TableCell className="font-medium sticky left-0 z-10 p-2">
                         {employee.short_name}
-                      </td>
+                      </TableCell>
                       {filteredMatrix[rowIndex]?.map((hours, colIndex) => (
-                        <td key={colIndex} className="border p-2 text-center">
+                        <TableCell key={colIndex} className="text-center p-2">
                           {hours > 0 ? hours.toFixed(1) : ''}
-                        </td>
+                        </TableCell>
                       ))}
-                      <td className="border p-2 text-center font-bold bg-gray-100">
+                      <TableCell className="text-center font-bold p-2">
                         {totals.rows[rowIndex]?.toFixed(1) || '0.0'}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-gray-200 font-bold">
-                    <td className="border p-2 text-right">Total</td>
+                </TableBody>
+                <TableFooter>
+                  <TableRow className="font-bold">
+                    <TableCell className="text-right p-2">Total</TableCell>
                     {filteredTotalsCols.map((total, index) => (
-                      <td key={index} className="border p-2 text-center">
+                      <TableCell key={index} className="text-center p-2">
                         {total.toFixed(1)}
-                      </td>
+                      </TableCell>
                     ))}
-                    <td className="border p-2 text-center">
+                    <TableCell className="text-center p-2">
                       {totals.rows.reduce((sum, rowTotal) => sum + rowTotal, 0).toFixed(1)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
+                    </TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
             </div>
           )}
         </CardContent>
@@ -280,13 +288,13 @@ const TablaHoras: React.FC = () => {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>Reporte de Horas</span>
+          <span>{format(currentMonth, 'MMMM yyyy', { locale: es })}</span>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handlePreviousMonth}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Button variant="outline" size="sm" onClick={handleCurrentMonth}>
-              Mes Actual
+              <ChevronLeft className="h-4 w-4 rotate-180" />
             </Button>
           </div>
         </CardTitle>

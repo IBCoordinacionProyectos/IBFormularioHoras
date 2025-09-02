@@ -112,6 +112,8 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
 
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [isTableModalOpen, setIsTableModalOpen] = useState<boolean>(false);
+  const [isTableVisible, setIsTableVisible] = useState<boolean>(false);
+  const [isHoveringTableButton, setIsHoveringTableButton] = useState<boolean>(false);
   const [isDirty, setIsDirty] = useState<boolean>(false);
   const [loading, setLoading] = useState({
     submit: false,
@@ -794,18 +796,21 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                   <ClipboardList className="h-5 w-5" />
                   Actividades del Día
                 </CardTitle>
-                <Dialog open={isTableModalOpen} onOpenChange={setIsTableModalOpen}>
-                  <DialogTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      title="Ver tabla de horas"
-                      className="absolute right-4 top-4"
-                    >
-                      <Clock className="h-4 w-4" />
-                    </Button>
-                  </DialogTrigger>
+                {/* Dialog to show table on hover */}
+                <Dialog open={isHoveringTableButton} onOpenChange={setIsHoveringTableButton}>
+                  {/* Button to show table on hover */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    title="Ver tabla de horas"
+                    className="absolute right-4 top-4"
+                    onMouseEnter={() => setIsHoveringTableButton(true)}
+
+                    
+                  >
+                    <Clock className="h-4 w-4" />
+                  </Button>
                   <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Reporte de Horas</DialogTitle>
