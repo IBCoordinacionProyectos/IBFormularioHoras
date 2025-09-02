@@ -164,16 +164,61 @@ def get_user_by_username(username: str):
 
 def get_activity_id(project_code: str, phase: str, discipline: str, activity: str) -> int:
     """Obtiene el ID de una actividad específica."""
-    response = (
-        supabase
-        .table("IB_Activities")
-        .select("activity_id")
-        .eq("project_code", project_code)
-        .eq("phase", phase)
-        .eq("discipline", discipline)
-        .eq("activity", activity)
-        .execute()
-    )
+    # Manejar el caso especial de N/A - No Aplica
+    if discipline == 'N/A - No Aplica':
+        # Intentar con diferentes variaciones
+        discipline_variations = [
+            'N/A - No Aplica',
+            'N/A-No Aplica',
+            'N/A - No Aplica ',
+            ' N/A - No Aplica',
+            'N/A - No Aplica',
+            'N/A- No Aplica',
+            'N/A -No Aplica'
+        ]
+    else:
+        discipline_variations = [discipline]
+    
+    # Intentar con cada variación de disciplina
+    response = None
+    for variation in discipline_variations:
+        response = (
+            supabase
+            .table("IB_Activities")
+            .select("activity_id")
+            .eq("project_code", project_code)
+            .eq("phase", phase)
+            .eq("discipline", variation)
+            .eq("activity", activity)
+            .execute()
+        )
+        
+        if response.data:
+            break
+            
+        # Búsqueda insensible a mayúsculas/minúsculas y espacios
+        if not response.data:
+            response = supabase.table("IB_Activities") \
+                .select("activity_id") \
+                .eq("project_code", project_code) \
+                .eq("phase", phase) \
+                .ilike("discipline", f"%{variation.strip()}%") \
+                .eq("activity", activity) \
+                .execute()
+            
+            if response.data:
+                break
+    
+    # Si aún no hay resultados, intentar una búsqueda más amplia
+    if not response or not response.data:
+        response = supabase.table("IB_Activities") \
+            .select("activity_id") \
+            .eq("project_code", project_code) \
+            .eq("phase", phase) \
+            .ilike("discipline", "%N/A%") \
+            .eq("activity", activity) \
+            .execute()
+    
     if not response.data:
         raise ValueError(
             f"No se encontró la actividad: {activity} en la fase '{phase}' "
