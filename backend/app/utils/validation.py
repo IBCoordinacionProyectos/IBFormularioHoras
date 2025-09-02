@@ -41,8 +41,8 @@ def validate_project_code(project_code: str) -> str:
     
     sanitized = sanitize_string(project_code, 50)
     
-    # Project code should only contain alphanumeric characters, hyphens, and underscores
-    if not re.match(r'^[A-Za-z0-9_-]+$', sanitized):
+    # Project code should contain alphanumeric characters, hyphens, underscores, spaces, and periods
+    if not re.match(r'^[A-Za-z0-9_\- .()]+$', sanitized):
         raise ValueError("Project code contains invalid characters")
     
     return sanitized

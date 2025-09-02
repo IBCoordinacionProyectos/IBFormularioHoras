@@ -68,7 +68,7 @@ const validateInput = (input: any, type: string, maxLength: number = 1000): stri
   // Pattern validation based on type
   switch (type) {
     case 'project_code':
-      if (!/^[A-Z0-9_-]+$/i.test(str)) {
+      if (!/^[A-Z0-9_\- .()]+$/i.test(str)) {
         throw new Error('Project code contains invalid characters');
       }
       break;
