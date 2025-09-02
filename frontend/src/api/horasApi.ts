@@ -200,3 +200,35 @@ export const loginUser = async (credentials: any) => {
   const res = await axios.post(`${API_BASE_URL}/auth/login`, credentials);
   return res.data;
 };
+
+/* =========================
+   Reportes
+   ========================= */
+export interface MonthlyReportEntry {
+  id: string;
+  date: string;              // "YYYY-MM-DD"
+  employee_id: number;
+  employee_name: string;
+  employee_short_name: string;
+  project_code: string;
+  phase: string;
+  discipline: string;
+  activity: string;
+  hours: number;
+  note?: string;
+}
+
+export const getMonthlyHoursReport = async (year: number, month: number): Promise<MonthlyReportEntry[]> => {
+  try {
+    const res = await axios.get<MonthlyReportEntry[]>(`${API_BASE_URL}/hours/monthly-report/${year}/${month}`);
+    return res.data || [];
+  } catch (error: any) {
+    console.error(`Error al obtener el reporte mensual de horas para ${year}-${month}:`, error);
+    if (axios.isAxiosError(error) && error.response) {
+      console.error('Detalles del error (getMonthlyHoursReport):', error.response.data);
+      const detail = (error.response.data as any)?.detail ?? (error.response.data as any)?.message;
+      if (detail) throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+    }
+    throw error;
+  }
+};

@@ -43,3 +43,14 @@ def delete_hour(hour_id: str):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error interno al eliminar: {str(e)}")
+
+@router.get("/monthly-report/{year}/{month}")
+def get_monthly_hours_report(year: int, month: int):
+    logger.info(f"--- Solicitando reporte mensual de horas para año: {year}, mes: {month} ---")
+    try:
+        report_data = crud.get_monthly_hours_report(year, month)
+        logger.info(f"Reporte mensual generado exitosamente para {year}-{month}.")
+        return report_data
+    except Exception as e:
+        logger.error(f"Excepción inesperada al generar reporte mensual para {year}-{month}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error interno al generar reporte: {str(e)}")

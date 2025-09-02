@@ -343,3 +343,60 @@ def get_daily_activities(date: str, employee_id: int):
         activities.append(activity)
 
     return activities
+
+def get_monthly_hours_report(year: int, month: int):
+    """Devuelve un reporte de horas mensuales agrupadas por colaborador."""
+    logger.info("▶ get_monthly_hours_report | year=%s month=%s", year, month)
+    
+    # Formatear las fechas para el rango del mes
+    from datetime import date
+    import calendar
+    
+    # Primer y último día del mes
+    start_date = date(year, month, 1)
+    last_day = calendar.monthrange(year, month)[1]
+    end_date = date(year, month, last_day)
+    
+    # 1. Traer todas las horas del mes
+    hours_resp = (
+        supabase
+        .table("IB_Reported_Hours")
+        .select("*")
+        .gte("date", start_date.isoformat())
+        .lte("date", end_date.isoformat())
+        .order("date", desc=False)
+        .execute()
+    )
+    
+    if not hours_resp.data:
+        logger.info("Sin registros de horas para el mes especificado")
+        return []
+    
+    # 2. Obtener todos los empleados
+    employees_resp = supabase.table("IB_Members").select("id, name, short_name").execute()
+    employees_map = {emp["id"]: {"name": emp["name"], "short_name": emp["short_name"]} for emp in employees_resp.data}
+    
+    # 3. Procesar y agrupar los datos
+    monthly_report = []
+    for row in hours_resp.data:
+        # Convertir fecha string -> date para el esquema Pydantic
+        try:
+            row_date = datetime.fromisoformat(row["date"]).date()
+        except ValueError:
+            try:
+                row_date = datetime.strptime(row["date"], "%d/%m/%Y").date()
+            except ValueError:
+                row_date = None
+                
+        # Obtener información del empleado
+        employee_info = employees_map.get(row["employee_id"], {"name": f"Empleado {row['employee_id']}", "short_name": f"E{row['employee_id']}"})
+        
+        report_entry = {
+            **row,
+            "date": row_date,
+            "employee_name": employee_info["name"],
+            "employee_short_name": employee_info["short_name"]
+        }
+        monthly_report.append(report_entry)
+    
+    return monthly_report

@@ -31,13 +31,16 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Calendar } from './ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import { cn } from '../lib/utils';
+import { Dialog, DialogContent, DialogTrigger } from './ui/dialog';
 
 import { FormSelect } from './formulario/FormSelect';
 import { ActivityItem } from './formulario/ActivityItem';
 import { ActivityListSkeleton } from './formulario/ActivityListSkeleton';
 import { EmptyState } from './formulario/EmptyState';
 import { TotalHoursProgress } from './formulario/TotalHoursProgress';
+import TablaHoras from './TablaHoras';
 
 import {
   submitHours,
@@ -108,6 +111,7 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
   const [favorites, setFavorites] = useState<Favorite[]>([]);
 
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [isTableModalOpen, setIsTableModalOpen] = useState<boolean>(false);
   const [isDirty, setIsDirty] = useState<boolean>(false);
   const [loading, setLoading] = useState({
     submit: false,
@@ -539,7 +543,7 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                   Registra tus horas del día para el proyecto seleccionado.
                 </p>
 
-                <div className="mt-3 text-xs sm:text-sm text-foreground/80 flex flex-wrap justify-center gap-2">
+                <div className="mt-3 text-xs sm:text-sm text-foreground/80 flex-wrap justify-center gap-2">
                   <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white border">
                     <Briefcase className="h-3.5 w-3.5" /> {formData.project_code || '—'}
                   </span>
@@ -790,16 +794,22 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                   <ClipboardList className="h-5 w-5" />
                   Actividades del Día
                 </CardTitle>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  title="Ordenar"
-                  onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
-                  className="absolute right-4 top-4"
-                >
-                  <ArrowUpDown className="h-4 w-4" />
-                </Button>
+                <Dialog open={isTableModalOpen} onOpenChange={setIsTableModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      title="Ver tabla de horas"
+                      className="absolute right-4 top-4"
+                    >
+                      <Clock className="h-4 w-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <TablaHoras />
+                  </DialogContent>
+                </Dialog>
 
                 <div className="text-sm text-muted-foreground flex items-center justify-center gap-3 mt-2">
                   <span className="inline-flex items-center gap-2">
@@ -839,18 +849,19 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
             </Card>
           </aside>
         </div>
+
       </div>
 
-      {undoData && (
-        <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 bg-red-50 border border-red-200 text-red-700 shadow rounded-full px-4 py-2 flex items-center gap-3">
-          <span className="text-sm">Registro eliminado.</span>
-          <Button size="sm" variant="outline" onClick={handleUndoDelete}>
-            <Undo2 className="h-4 w-4 mr-1" /> Deshacer
-          </Button>
-        </div>
-      )}
+  {undoData && (
+    <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 bg-red-50 border border-red-200 text-red-700 shadow rounded-full px-4 py-2 flex items-center gap-3">
+      <span className="text-sm">Registro eliminado.</span>
+      <Button size="sm" variant="outline" onClick={handleUndoDelete}>
+        <Undo2 className="h-4 w-4 mr-1" /> Deshacer
+      </Button>
     </div>
-  );
+  )}
+</div>
+);
 };
 
 export default FormularioHoras;
