@@ -7,3 +7,4 @@ psycopg2-binary
 supabase
 python-multipart
 starlette>=0.47.3
+slowapi

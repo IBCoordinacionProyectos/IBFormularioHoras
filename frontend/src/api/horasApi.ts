@@ -1,7 +1,107 @@
 // src/api/horasApi.ts
 import axios from 'axios';
 
-export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://backend.yeisonduque.top';
+// Security: Configure axios with security best practices
+axios.defaults.timeout = 30000; // 30 second timeout
+axios.defaults.maxRedirects = 5; // Limit redirects
+axios.defaults.validateStatus = (status) => status >= 200 && status < 300;
+
+// Additional security headers
+axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+axios.defaults.headers.common['X-Content-Type-Options'] = 'nosniff';
+
+// CSRF protection for non-GET requests
+axios.interceptors.request.use((config) => {
+  if (config.method && !['get', 'head', 'options'].includes(config.method.toLowerCase())) {
+    // Add CSRF token if available
+    const csrfToken = localStorage.getItem('csrf_token');
+    if (csrfToken) {
+      config.headers['X-CSRF-Token'] = csrfToken;
+    }
+  }
+  return config;
+});
+
+// Input validation helpers
+const isValidUrl = (url: string): boolean => {
+  try {
+    const parsedUrl = new URL(url);
+    // Only allow HTTPS in production
+    const isProduction = (process as any).env?.NODE_ENV === 'production';
+    if (isProduction && parsedUrl.protocol !== 'https:') {
+      return false;
+    }
+    // Prevent SSRF by only allowing specific domains
+    const allowedDomains = [
+      'backend.yeisonduque.top',
+      'localhost',
+      '127.0.0.1'
+    ];
+    return allowedDomains.some(domain =>
+      parsedUrl.hostname === domain || parsedUrl.hostname.endsWith('.' + domain)
+    );
+  } catch {
+    return false;
+  }
+};
+
+const sanitizeString = (input: string, maxLength: number = 1000): string => {
+  if (typeof input !== 'string') return '';
+  // Remove potentially dangerous characters and limit length
+  return input
+    .slice(0, maxLength)
+    .replace(/[<>'"&]/g, '') // Remove HTML injection chars
+    .replace(/[\x00-\x1F\x7F]/g, ''); // Remove control characters
+};
+
+// Enhanced input validation
+const validateInput = (input: any, type: string, maxLength: number = 1000): string => {
+  if (input === null || input === undefined) return '';
+
+  const str = String(input).trim();
+
+  // Length validation
+  if (str.length > maxLength) {
+    throw new Error(`${type} exceeds maximum length of ${maxLength} characters`);
+  }
+
+  // Pattern validation based on type
+  switch (type) {
+    case 'project_code':
+      if (!/^[A-Z0-9_-]+$/i.test(str)) {
+        throw new Error('Project code contains invalid characters');
+      }
+      break;
+    case 'phase':
+    case 'discipline':
+    case 'activity':
+      if (!/^[A-Za-z0-9\s\-_()]+$/i.test(str)) {
+        throw new Error(`${type} contains invalid characters`);
+      }
+      break;
+    case 'hours':
+      const num = parseFloat(str.replace(',', '.'));
+      if (isNaN(num) || num < 0 || num > 24) {
+        throw new Error('Hours must be a valid number between 0 and 24');
+      }
+      return num.toString();
+    case 'date':
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+        throw new Error('Date must be in YYYY-MM-DD format');
+      }
+      break;
+    case 'employee_id':
+      const empId = parseInt(str, 10);
+      if (isNaN(empId) || empId <= 0) {
+        throw new Error('Employee ID must be a positive integer');
+      }
+      return empId.toString();
+  }
+
+  return sanitizeString(str, maxLength);
+};
+
+export const API_BASE_URL = (process as any).env?.REACT_APP_API_BASE_URL || 'https://backend.yeisonduque.top';
 
 /* =========================
    Tipos base (ajusta si quieres)
@@ -38,30 +138,39 @@ const normalizeHours = (h: number | string | undefined) =>
   typeof h === 'string' ? parseFloat(h.replace(',', '.')) : (h ?? 0);
 
 // Para creación (POST) - incluye date
-const sanitizeCreate = (data: any) => ({
-  project_code: String(data.project_code ?? ''),
-  phase: String(data.phase ?? ''),
-  discipline: String(data.discipline ?? ''),
-  activity: String(data.activity ?? ''),
-  hours: typeof data.hours === 'string' ? parseFloat(data.hours.replace(',', '.')) : Number(data.hours ?? 0),
-  date: String(data.date ?? ''), // En POST sí va date
-  employee_id: typeof data.employee_id === 'string' ? parseInt(data.employee_id, 10) : Number(data.employee_id),
-  note: data.note ? String(data.note) : '',
-});
+const sanitizeCreate = (data: any) => {
+  try {
+    return {
+      project_code: validateInput(data.project_code, 'project_code', 50),
+      phase: validateInput(data.phase, 'phase', 100),
+      discipline: validateInput(data.discipline, 'discipline', 100),
+      activity: validateInput(data.activity, 'activity', 200),
+      hours: validateInput(data.hours, 'hours'),
+      date: validateInput(data.date, 'date'),
+      employee_id: validateInput(data.employee_id, 'employee_id'),
+      note: data.note ? validateInput(data.note, 'note', 500) : '',
+    };
+  } catch (error) {
+    throw new Error(`Validation error in create data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};
 
 // Para actualización (PUT) - sin date y sin campos no editables
 const sanitizeUpdate = (data: any) => {
-  // Extraer campos no permitidos en el update
-  const { date, id, employee_id, project_name, ...rest } = data;
-  return {
-    ...rest,
-    project_code: String(rest.project_code ?? ''),
-    phase: String(rest.phase ?? ''),
-    discipline: String(rest.discipline ?? ''),
-    activity: String(rest.activity ?? ''),
-    hours: typeof rest.hours === 'string' ? parseFloat(rest.hours.replace(',', '.')) : Number(rest.hours ?? 0),
-    note: rest.note ? String(rest.note) : '',
-  };
+  try {
+    // Extraer campos no permitidos en el update
+    const { date, id, employee_id, project_name, ...rest } = data;
+    return {
+      project_code: validateInput(rest.project_code, 'project_code', 50),
+      phase: validateInput(rest.phase, 'phase', 100),
+      discipline: validateInput(rest.discipline, 'discipline', 100),
+      activity: validateInput(rest.activity, 'activity', 200),
+      hours: validateInput(rest.hours, 'hours'),
+      note: rest.note ? validateInput(rest.note, 'note', 500) : '',
+    };
+  } catch (error) {
+    throw new Error(`Validation error in update data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 };
 
 const encodeId = (id: string | number) => encodeURIComponent(String(id));

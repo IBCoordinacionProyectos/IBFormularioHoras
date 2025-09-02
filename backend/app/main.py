@@ -1,9 +1,31 @@
 # main.py
-from fastapi import FastAPI, status
+from fastapi import FastAPI, status, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from .routers import projects, activities, hours, employees, daily_activities, auth
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers['X-Frame-Options'] = 'DENY'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        response.headers['Content-Security-Policy'] = "default-src 'self'"
+        return response
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI()
+
+# Add rate limiting middleware
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # Configuración de CORS
 origins = [
@@ -25,6 +47,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add security headers middleware
+app.add_middleware(SecurityHeadersMiddleware)
+
 
 app.include_router(daily_activities.router, prefix="/daily-activities", tags=["daily-activities"])
 app.include_router(projects.router, prefix="/projects", tags=["projects"])
@@ -34,10 +59,12 @@ app.include_router(employees.router, prefix="/employees", tags=["employees"])
 app.include_router(auth.router)
 
 @app.get("/")
-def read_root():
+@limiter.limit("10/minute")
+def read_root(request: Request):
     return {"message": "Welcome to the API"}
 
 @app.get("/health", status_code=status.HTTP_200_OK)
-def health_check():
+@limiter.limit("30/minute")
+def health_check(request: Request):
     """Endpoint de verificación de salud del servicio"""
     return {"status": "ok", "message": "Service is running"}

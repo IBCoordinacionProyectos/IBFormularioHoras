@@ -1,15 +1,20 @@
 # hours.py
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 import logging
 logging.basicConfig(level=logging.DEBUG)
 from .. import crud
 from ..schemas import ReportedHourCreate, ReportedHourUpdate, ReportedHour, GroupedHour
 
+limiter = Limiter(key_func=get_remote_address)
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 @router.post("/", response_model=ReportedHour)
-def create_hour(hour: ReportedHourCreate):
+@limiter.limit("20/minute")
+def create_hour(request: Request, hour: ReportedHourCreate):
     logger.debug(f"Creando hora con: {hour}")
     try:
         return crud.create_reported_hour(hour)
@@ -20,7 +25,8 @@ def create_hour(hour: ReportedHourCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/{hour_id}", response_model=ReportedHour)
-def update_hour(hour_id: str, hour: ReportedHourUpdate):
+@limiter.limit("30/minute")
+def update_hour(request: Request, hour_id: str, hour: ReportedHourUpdate):
     logger.info(f"--- Intentando actualizar hora ID: {hour_id} ---")
     logger.info(f"Datos recibidos: {hour.dict()}")
     try:
@@ -35,7 +41,8 @@ def update_hour(hour_id: str, hour: ReportedHourUpdate):
         raise HTTPException(status_code=500, detail=f"Error interno al actualizar: {str(e)}")
 
 @router.delete("/{hour_id}")
-def delete_hour(hour_id: str):
+@limiter.limit("10/minute")
+def delete_hour(request: Request, hour_id: str):
     try:
         deleted_hour_info = crud.delete_reported_hour(hour_id)
         return deleted_hour_info
@@ -46,7 +53,8 @@ def delete_hour(hour_id: str):
 
 
 @router.get("/grouped-by-employee", response_model=list[GroupedHour])
-def get_grouped_hours_by_employee(year: int, month: int):
+@limiter.limit("50/minute")
+def get_grouped_hours_by_employee(request: Request, year: int, month: int):
     logger.info(f"▶ get_grouped_hours_by_employee | year={year} month={month}")
     try:
         grouped_data = crud.get_grouped_hours_by_employee(year, month)
