@@ -1,5 +1,9 @@
 from fastapi import APIRouter, HTTPException, status
 from .. import crud, schemas
+from passlib.context import CryptContext
+
+# Password hashing context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 router = APIRouter(
     prefix="/auth",
@@ -16,8 +20,8 @@ def login(user_credentials: schemas.UserLogin):
             detail="Incorrect username or password",
         )
     
-    # En una aplicación real, deberías usar una biblioteca de hash de contraseñas segura como passlib
-    if user_credentials.password != db_user.get('password'):
+    # Verify password using passlib
+    if not pwd_context.verify(user_credentials.password, db_user.get('password')):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Incorrect username or password",
@@ -36,4 +40,3 @@ def login(user_credentials: schemas.UserLogin):
         "employee_id": db_user.get('id_members'),
         "employee_name": member['name']
     }
-    return {"status": "success", "message": "Login successful", "employee_id": db_user.get('id_members')}

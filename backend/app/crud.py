@@ -1,6 +1,15 @@
 # crud.py
 from .database import supabase
 from . import schemas
+from .utils.validation import (
+    validate_project_code,
+    validate_phase_discipline_activity,
+    validate_hours,
+    validate_date,
+    validate_employee_id,
+    validate_note,
+    sanitize_string
+)
 import uuid
 from datetime import date, datetime
 import logging
@@ -175,30 +184,40 @@ def get_activity_id(project_code: str, phase: str, discipline: str, activity: st
     return int(row["activity_id"])
 
 def create_reported_hour(hour: schemas.ReportedHourCreate):
-    # 1. Validar que el proyecto existe
-    project = get_project_by_code(hour.project_code)
-    if not project:
-        raise ValueError(f"Proyecto no encontrado: {hour.project_code}")
+    # 1. Validar y sanitizar los datos de entrada
+    validated_project_code = validate_project_code(hour.project_code)
+    validated_phase = validate_phase_discipline_activity(hour.phase, "Phase")
+    validated_discipline = validate_phase_discipline_activity(hour.discipline, "Discipline")
+    validated_activity = validate_phase_discipline_activity(hour.activity, "Activity")
+    validated_hours = validate_hours(hour.hours)
+    validated_date = validate_date(hour.date.isoformat())
+    validated_employee_id = validate_employee_id(hour.employee_id)
+    validated_note = validate_note(hour.note)
 
-    # 2. Obtener el ID de la actividad
+    # 2. Validar que el proyecto existe
+    project = get_project_by_code(validated_project_code)
+    if not project:
+        raise ValueError(f"Proyecto no encontrado: {validated_project_code}")
+
+    # 3. Obtener el ID de la actividad
     activity_id = get_activity_id(
-        hour.project_code, hour.phase, hour.discipline, hour.activity
+        validated_project_code, validated_phase, validated_discipline, validated_activity
     )
 
-    # 3. Preparar los datos para la inserción
+    # 4. Preparar los datos para la inserción
     data_to_insert = {
-        "date": hour.date.isoformat(),
-        "employee_id": str(hour.employee_id),
-        "project_code": hour.project_code,
-        "phase": hour.phase,
-        "discipline": hour.discipline,
-        "activity": hour.activity,
-        "hours": str(hour.hours),
-        "note": hour.note,
+        "date": validated_date,
+        "employee_id": str(validated_employee_id),
+        "project_code": validated_project_code,
+        "phase": validated_phase,
+        "discipline": validated_discipline,
+        "activity": validated_activity,
+        "hours": str(validated_hours),
+        "note": validated_note,
         "id": str(uuid.uuid4()),
     }
 
-    # 4. Insertar en la base de datos
+    # 5. Insertar en la base de datos
     response = supabase.table("IB_Reported_Hours").insert(data_to_insert).execute()
     error_info = getattr(response, "error", None)
     if error_info:
@@ -225,16 +244,35 @@ def update_reported_hour(hour_id: str, hour_update: schemas.ReportedHourUpdate):
     try:
         data_to_update = hour_update.dict(exclude_unset=True)
 
-        # --- VALIDACIÓN AÑADIDA ---
+        # Validar y sanitizar los datos de entrada si están presentes
         if "project_code" in data_to_update:
+            data_to_update["project_code"] = validate_project_code(data_to_update["project_code"])
             project = get_project_by_code(data_to_update["project_code"])
             if not project:
                 raise ValueError(
                     f"El proyecto con código {data_to_update['project_code']} no fue encontrado."
                 )
 
+        if "phase" in data_to_update:
+            data_to_update["phase"] = validate_phase_discipline_activity(data_to_update["phase"], "Phase")
+
+        if "discipline" in data_to_update:
+            data_to_update["discipline"] = validate_phase_discipline_activity(data_to_update["discipline"], "Discipline")
+
+        if "activity" in data_to_update:
+            data_to_update["activity"] = validate_phase_discipline_activity(data_to_update["activity"], "Activity")
+
+        if "hours" in data_to_update:
+            data_to_update["hours"] = validate_hours(data_to_update["hours"])
+
         if "date" in data_to_update and data_to_update["date"]:
-            data_to_update["date"] = data_to_update["date"].isoformat()
+            data_to_update["date"] = validate_date(data_to_update["date"].isoformat())
+
+        if "employee_id" in data_to_update:
+            data_to_update["employee_id"] = validate_employee_id(data_to_update["employee_id"])
+
+        if "note" in data_to_update:
+            data_to_update["note"] = validate_note(data_to_update["note"])
 
         response = (
             supabase
