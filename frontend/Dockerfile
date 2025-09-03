@@ -1,29 +1,25 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1.7
 
-# Etapa de construcción
+# Etapa de build
 FROM node:22.19.0-slim AS build
 WORKDIR /app
-
 ENV CI=true \
-    GENERATE_SOURCEMAP=false
+    GENERATE_SOURCEMAP=false \
+    NODE_ENV=production
 
-# Solo los manifests primero
+# Manifiestos primero para cache de deps
 COPY package*.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci --legacy-peer-deps
 
-# Instalar deps (como root) – Vite 7 compatible con Node 22.12+
-RUN npm ci --legacy-peer-deps
-
-# Copiar el resto del código (sin node_modules gracias a .dockerignore)
+# Código (solo el de este contexto ./frontend gracias al context en Dokploy)
 COPY . .
-
-# Compilar (como root para evitar permisos)
 RUN npm run build
 
-# Etapa de producción
+# Etapa de runtime: solo archivos estáticos
 FROM nginx:alpine
-RUN rm -rf /usr/share/nginx/html/*
-COPY --from=build /app/dist/ /usr/share/nginx/html/
+# Config SPA + caché (la definimos abajo)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-
+# Copia SOLO artefactos compilados
+COPY --from=build /app/dist/ /usr/share/nginx/html/
 EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["nginx","-g","daemon off;"]
