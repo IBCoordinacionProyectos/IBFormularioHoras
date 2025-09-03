@@ -1,5 +1,5 @@
 # Etapa de construcción
-FROM node:20-slim AS build
+FROM node:22.11.0-slim AS build
 
 # Establecer el directorio de trabajo
 WORKDIR /app
@@ -27,7 +27,7 @@ COPY --chown=node:node . .
 RUN npm run build
 
 # Etapa de producción
-FROM nginx:stable-alpine
+FROM nginx:alpine
 
 # Limpiar contenido por defecto de nginx
 RUN rm -rf /usr/share/nginx/html/*
