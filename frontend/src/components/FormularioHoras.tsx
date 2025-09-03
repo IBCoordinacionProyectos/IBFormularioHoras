@@ -165,7 +165,14 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
     const raw = localStorage.getItem(DRAFT_KEY);
     if (raw) { try {
       const draft = JSON.parse(raw);
-      setFormData((prev) => ({ ...prev, ...draft, employee_id: String(employeeId) }));
+      // Restore form data but keep project_code empty to ensure it's cleared on page refresh
+      const { project_code, ...draftWithoutProjectCode } = draft;
+      setFormData((prev) => ({
+        ...prev,
+        ...draftWithoutProjectCode,
+        project_code: '', // Always initialize project_code as empty
+        employee_id: String(employeeId)
+      }));
     } catch {} }
   }, [employeeId]);
   useEffect(() => { localStorage.setItem(DRAFT_KEY, JSON.stringify(formData)); }, [formData]);
