@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Etapa de construcción
-FROM node:22.12.0-slim AS build
+FROM node:22.19.0-slim AS build
 WORKDIR /app
 
 ENV CI=true \
