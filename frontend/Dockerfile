@@ -9,7 +9,7 @@ ENV CI=true \
 
 # Manifiestos primero para cache de deps
 COPY package*.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci --legacy-peer-deps
+RUN --mount=type=cache,target=/root/.npm npm ci --include=dev --legacy-peer-deps
 
 # Código (solo el de este contexto ./frontend gracias al context en Dokploy)
 COPY . .
