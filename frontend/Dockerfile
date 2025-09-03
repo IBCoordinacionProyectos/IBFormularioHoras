@@ -11,9 +11,8 @@ ENV CI=true \
 # Copiar package.json e instalar dependencias
 COPY package*.json ./
 
-# Instalar dependencias y react-scripts globalmente
-RUN npm install -g react-scripts && npm ci --legacy-peer-deps --unsafe-perm && chown -R node:node /app
-
+# Instalar dependencias con Vite
+RUN npm ci --legacy-peer-deps --unsafe-perm && chown -R node:node /app
 
 # Cambiar al usuario node para evitar problemas de permisos
 USER node
@@ -21,7 +20,7 @@ USER node
 # Copiar el resto del código fuente
 COPY --chown=node:node . .
 
-# Compilar la aplicación para producción
+# Compilar la aplicación para producción con Vite
 RUN npm run build
 
 # Etapa de producción
@@ -30,8 +29,8 @@ FROM nginx:stable-alpine
 # Limpiar contenido por defecto de nginx
 RUN rm -rf /usr/share/nginx/html/*
 
-# Copiar la aplicación construida
-COPY --from=build /app/build/ /usr/share/nginx/html/
+# Copiar la aplicación construida desde el directorio dist de Vite
+COPY --from=build /app/dist/ /usr/share/nginx/html/
 
 # Copiar configuración personalizada de nginx
 COPY nginx.conf /etc/nginx/conf.d/default.conf
