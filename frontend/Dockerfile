@@ -12,16 +12,13 @@ ENV CI=true \
 COPY package*.json ./
 
 # Instalar dependencias con Vite
-RUN npm ci --legacy-peer-deps --unsafe-perm && chown -R node:node /app
+RUN npm ci --legacy-peer-deps --unsafe-perm
+
+# Copiar el resto del código fuente
+COPY . .
 
 # Cambiar al usuario node para evitar problemas de permisos
 USER node
-
-# Asegurar permisos de ejecución para binarios de node_modules
-RUN chmod +x node_modules/.bin/vite
-
-# Copiar el resto del código fuente
-COPY --chown=node:node . .
 
 # Compilar la aplicación para producción con Vite
 RUN npm run build
