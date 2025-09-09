@@ -27,7 +27,7 @@ const isValidUrl = (url: string): boolean => {
   try {
     const parsedUrl = new URL(url);
     // Only allow HTTPS in production
-    const isProduction = (process as any).env?.NODE_ENV === 'production';
+    const isProduction = import.meta.env.PROD;
     if (isProduction && parsedUrl.protocol !== 'https:') {
       return false;
     }
@@ -103,7 +103,7 @@ const validateInput = (input: any, type: string, maxLength: number = 1000): stri
   return sanitizeString(str, maxLength);
 };
 
-export const API_BASE_URL = (process as any).env?.REACT_APP_API_BASE_URL || 'https://backend.yeisonduque.top';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://backend.yeisonduque.top';
 
 /* =========================
    Tipos base (ajusta si quieres)

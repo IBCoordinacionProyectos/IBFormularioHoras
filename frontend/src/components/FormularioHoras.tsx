@@ -818,14 +818,16 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                   >
                     <Clock className="h-4 w-4" />
                   </Button>
-                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
+                  <DialogContent className="w-[98vw] max-w-none max-h-[95vh] overflow-hidden p-6">
+                    <DialogHeader className="mb-4">
                       <DialogTitle>Reporte de Horas</DialogTitle>
                       <DialogDescription>
                         Visualiza el reporte de horas registradas por mes.
                       </DialogDescription>
                     </DialogHeader>
-                    <TablaHoras />
+                    <div className="overflow-auto max-h-[calc(95vh-120px)]">
+                      <TablaHoras />
+                    </div>
                   </DialogContent>
                 </Dialog>
 

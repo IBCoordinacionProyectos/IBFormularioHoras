@@ -61,7 +61,7 @@ const FormularioPermisosWrapper: React.FC<{
 function App() {
  const [authenticatedUser, setAuthenticatedUser] = useState<AuthenticatedUser | null>(() => {
     // Comprueba la variable de entorno para saltar el login en modo de desarrollo.
-    if (process.env.REACT_APP_SKIP_LOGIN === 'true') {
+    if (import.meta.env.VITE_SKIP_LOGIN === 'true') {
       return { id: 999, name: 'Usuario de Desarrollo' }; // Usuario de prueba
     }
     return null;
