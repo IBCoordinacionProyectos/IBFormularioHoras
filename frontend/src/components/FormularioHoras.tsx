@@ -818,7 +818,7 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
                   >
                     <Clock className="h-4 w-4" />
                   </Button>
-                  <DialogContent className="w-[98vw] max-w-none max-h-[95vh] overflow-hidden p-6">
+                  <DialogContent className="w-auto max-w-none max-h-[95vh] overflow-hidden p-6">
                     <DialogHeader className="mb-4">
                       <DialogTitle>Reporte de Horas</DialogTitle>
                       <DialogDescription>

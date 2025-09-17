@@ -232,31 +232,31 @@ const TablaHoras: React.FC = () => {
               <p>No hay datos para el mes seleccionado.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
+            <div className="overflow-x-auto" style={{ maxWidth: '100%' }}>
+              <Table style={{ tableLayout: 'fixed', minWidth: '100%' }}>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-black font-bold sticky left-0 z-10 p-2">Colaborador</TableHead>
+                    <TableHead className="text-black font-bold sticky left-0 z-10 p-2 bg-white" style={{ width: '200px' }}>Colaborador</TableHead>
                     {daysWithHours.map((day, index) => (
-                      <TableHead key={index} className="text-black font-bold text-center p-2">
+                      <TableHead key={index} className="text-black font-bold text-center p-2" style={{ width: '60px' }}>
                         {parseInt(day.split('-')[2], 10)}
                       </TableHead>
                     ))}
-                    <TableHead className="text-black font-bold text-center p-2">Total</TableHead>
+                    <TableHead className="text-black font-bold text-center p-2" style={{ width: '80px' }}>Total</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {employees.map((employee, rowIndex) => (
                     <TableRow key={employee.id}>
-                      <TableCell className="font-medium sticky left-0 z-10 p-2">
+                      <TableCell className="font-medium sticky left-0 z-10 p-2 bg-white" style={{ width: '200px' }}>
                         {employee.short_name}
                       </TableCell>
                       {filteredMatrix[rowIndex]?.map((hours, colIndex) => (
-                        <TableCell key={colIndex} className="text-center p-2">
+                        <TableCell key={colIndex} className="text-center p-2" style={{ width: '60px' }}>
                           {hours > 0 ? hours.toFixed(1) : ''}
                         </TableCell>
                       ))}
-                      <TableCell className="text-center font-bold p-2">
+                      <TableCell className="text-center font-bold p-2" style={{ width: '80px' }}>
                         {totals.rows[rowIndex]?.toFixed(1) || '0.0'}
                       </TableCell>
                     </TableRow>
@@ -264,13 +264,13 @@ const TablaHoras: React.FC = () => {
                 </TableBody>
                 <TableFooter>
                   <TableRow className="font-bold">
-                    <TableCell className="text-right p-2">Total</TableCell>
+                    <TableCell className="text-right sticky left-0 z-10 p-2 bg-white" style={{ width: '200px' }}>Total</TableCell>
                     {filteredTotalsCols.map((total, index) => (
-                      <TableCell key={index} className="text-center p-2">
+                      <TableCell key={index} className="text-center p-2" style={{ width: '60px' }}>
                         {total.toFixed(1)}
                       </TableCell>
                     ))}
-                    <TableCell className="text-center p-2">
+                    <TableCell className="text-center p-2" style={{ width: '80px' }}>
                       {totals.rows.reduce((sum, rowTotal) => sum + rowTotal, 0).toFixed(1)}
                     </TableCell>
                   </TableRow>
