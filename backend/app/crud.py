@@ -13,8 +13,41 @@ from .utils.validation import (
 import uuid
 from datetime import date, datetime
 import logging
+import time
 
 logger = logging.getLogger(__name__)
+
+def _retry_supabase_operation(operation_func, max_retries=3, base_delay=0.5):
+    """
+    Retry a Supabase operation with exponential backoff.
+    Handles connection timeouts and temporary failures.
+    """
+    last_exception = None
+
+    for attempt in range(max_retries):
+        try:
+            return operation_func()
+        except Exception as e:
+            last_exception = e
+            error_msg = str(e).lower()
+
+            # Check if this is a connection-related error that we should retry
+            is_retryable_error = any(keyword in error_msg for keyword in [
+                'timeout', 'connection', 'network', 'server error', '500',
+                'connection pool', 'connection reset', 'broken pipe'
+            ])
+
+            if not is_retryable_error or attempt == max_retries - 1:
+                # Not retryable or last attempt, re-raise
+                raise e
+
+            # Calculate delay with exponential backoff
+            delay = base_delay * (2 ** attempt)
+            logger.warning(f"Supabase operation failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {delay}s...")
+            time.sleep(delay)
+
+    # This should never be reached, but just in case
+    raise last_exception
 
 def get_project_by_code(project_code: str):
     clean_code = project_code.strip()
@@ -423,49 +456,56 @@ def get_daily_activities(date: str, employee_id: int):
     """Devuelve las horas reportadas del día (YYYY-MM-DD) junto al nombre del proyecto."""
     logger.info("▶ get_daily_activities | date=%s employee_id=%s", date, employee_id)
 
-    # 1. Traer horas del día para el empleado
-    hours_resp = (
-        supabase
-        .table("IB_Reported_Hours")
-        .select("*")
-        .eq("date", date)
-        .eq("employee_id", employee_id)
-        .execute()
-    )
-    if not hours_resp.data:
-        logger.info("Sin registros de horas para esos criterios")
-        return []
+    try:
+        # 1. Traer horas del día para el empleado con retry
+        hours_resp = _retry_supabase_operation(
+            lambda: supabase
+                .table("IB_Reported_Hours")
+                .select("*")
+                .eq("date", date)
+                .eq("employee_id", str(employee_id))
+                .execute()
+        )
 
-    # 2. Obtener nombres de proyectos
-    project_codes = list({h["project_code"] for h in hours_resp.data})
-    proj_resp = (
-        supabase
-        .table("IB_Projects")
-        .select("code, name")
-        .in_("code", project_codes)
-        .execute()
-    )
-    projects_map = {p["code"]: p["name"] for p in (proj_resp.data or [])}
+        if not hours_resp.data:
+            logger.info("Sin registros de horas para esos criterios")
+            return []
 
-    activities = []
-    for row in hours_resp.data:
-        # Convertir fecha string -> date para el esquema Pydantic
-        try:
-            row_date = datetime.fromisoformat(row["date"]).date()
-        except ValueError:
+        # 2. Obtener nombres de proyectos con retry
+        project_codes = list({h["project_code"] for h in hours_resp.data})
+        proj_resp = _retry_supabase_operation(
+            lambda: supabase
+                .table("IB_Projects")
+                .select("code, name")
+                .in_("code", project_codes)
+                .execute()
+        )
+
+        projects_map = {p["code"]: p["name"] for p in (proj_resp.data or [])}
+
+        activities = []
+        for row in hours_resp.data:
+            # Convertir fecha string -> date para el esquema Pydantic
             try:
-                row_date = datetime.strptime(row["date"], "%d/%m/%Y").date()
+                row_date = datetime.fromisoformat(row["date"]).date()
             except ValueError:
-                row_date = None
+                try:
+                    row_date = datetime.strptime(row["date"], "%d/%m/%Y").date()
+                except ValueError:
+                    row_date = None
 
-        activity = {
-            **row,
-            "date": row_date,
-            "project_name": projects_map.get(row["project_code"], "Proyecto no encontrado"),
-        }
-        activities.append(activity)
+            activity = {
+                **row,
+                "date": row_date,
+                "project_name": projects_map.get(row["project_code"], "Proyecto no encontrado"),
+            }
+            activities.append(activity)
 
-    return activities
+        return activities
+
+    except Exception as e:
+        logger.error(f"Error en get_daily_activities después de reintentos: {e}", exc_info=True)
+        raise
 
 
 def get_grouped_hours_by_employee(year: int, month: int):

@@ -4,7 +4,7 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Header from './Header';
 
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import {
   Calendar as CalendarIcon,
   Briefcase,
@@ -506,7 +506,6 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
 
   return (
     <div className="min-h-screen bg-[#f2f6fd] text-foreground">
-      <Toaster position="top-right" richColors />
       <Header
         employeeName={employeeName}
         onLogout={onLogout}

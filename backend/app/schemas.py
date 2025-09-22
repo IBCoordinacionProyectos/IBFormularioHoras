@@ -1,5 +1,7 @@
 # schemas.py
-from pydantic import BaseModel, ConfigDict
+from __future__ import annotations
+
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import date
 from typing import Optional
 
@@ -31,17 +33,17 @@ class ReportedHourCreate(BaseModel):
     discipline: str
     activity: str
     hours: float
-    note: Optional[str] = None
+    note: Optional[str] = Field(default=None)
 
 class ReportedHourUpdate(BaseModel):
-    date: Optional[date] = None
-    employee_id: Optional[int] = None
-    project_code: Optional[str] = None
-    phase: Optional[str] = None
-    discipline: Optional[str] = None
-    activity: Optional[str] = None
-    hours: Optional[float] = None
-    note: Optional[str] = None
+    date: Optional[date] = Field(default=None)
+    employee_id: Optional[int] = Field(default=None)
+    project_code: Optional[str] = Field(default=None)
+    phase: Optional[str] = Field(default=None)
+    discipline: Optional[str] = Field(default=None)
+    activity: Optional[str] = Field(default=None)
+    hours: Optional[float] = Field(default=None)
+    note: Optional[str] = Field(default=None)
 
 class ReportedHour(ReportedHourCreate):
     id: str  # UUID
@@ -57,7 +59,7 @@ class DailyActivity(BaseModel):
     discipline: str
     activity: str
     hours: float
-    note: str = None
+    note: Optional[str] = Field(default=None)
     model_config = ConfigDict(from_attributes=True)
 
 # Añade esta clase al final del archivo

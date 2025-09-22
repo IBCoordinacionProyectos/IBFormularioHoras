@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 import { Toaster } from 'sonner';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 
+const routerFuture = {
+  v7_startTransition: true,
+  v7_relativeSplatPath: true,
+};
+
 // Application components
 import FormularioHoras from './components/FormularioHoras';
 import FormularioPermisos from './components/FormularioPermisos';
@@ -98,7 +103,7 @@ function App() {
   }
 
   return (
-    <Router>
+    <Router future={routerFuture}>
       <div className="min-h-screen bg-background text-foreground flex flex-col">
         <Toaster position="top-right" richColors />
         

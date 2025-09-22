@@ -289,6 +289,49 @@ export const getActivitiesByDiscipline = async (
 /* =========================
    Consultas de horas
    ========================= */
+
+// Helper function for retrying API calls with exponential backoff
+const retryApiCall = async <T>(
+  apiCall: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> => {
+  let lastError: any;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await apiCall();
+    } catch (error: any) {
+      lastError = error;
+
+      // Check if this is a retryable error (connection issues, 500 errors, timeouts)
+      const isRetryable =
+        axios.isAxiosError(error) &&
+        (
+          error.code === 'ECONNABORTED' || // Timeout
+          error.code === 'ENOTFOUND' ||    // DNS/Network issues
+          error.code === 'ECONNREFUSED' || // Connection refused
+          (error.response?.status === 500) || // Server errors
+          (error.response?.status === 502) || // Bad Gateway
+          (error.response?.status === 503) || // Service Unavailable
+          (error.response?.status === 504)    // Gateway Timeout
+        );
+
+      if (!isRetryable || attempt === maxRetries - 1) {
+        // Not retryable or last attempt, throw the error
+        throw error;
+      }
+
+      // Calculate delay with exponential backoff and jitter
+      const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
+      console.warn(`API call failed (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms:`, error.message);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError;
+};
+
 export const getDailyActivities = async (
   date: Date | string,
   employeeId: number | string
@@ -297,11 +340,26 @@ export const getDailyActivities = async (
   const empId =
     typeof employeeId === 'string' ? parseInt(employeeId, 10) : Number(employeeId);
 
-  const res = await axios.get<DailyActivity[]>(`${API_BASE_URL}/daily-activities`, {
-    params: { date: dateStr, employee_id: empId },
-    validateStatus: (s) => s >= 200 && s < 300,
-  });
-  return res.data || [];
+  try {
+    const result = await retryApiCall(
+      () => axios.get<DailyActivity[]>(`${API_BASE_URL}/daily-activities`, {
+        params: { date: dateStr, employee_id: empId },
+        validateStatus: (s) => s >= 200 && s < 300,
+      }),
+      3, // maxRetries
+      1000 // baseDelay in ms
+    );
+
+    return result.data || [];
+  } catch (error: any) {
+    console.error('Error fetching daily activities after retries:', error);
+    if (axios.isAxiosError(error) && error.response) {
+      console.error('Response details:', error.response.data);
+      const detail = (error.response.data as any)?.detail ?? (error.response.data as any)?.message;
+      if (detail) throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+    }
+    throw error;
+  }
 };
 
 /* =========================

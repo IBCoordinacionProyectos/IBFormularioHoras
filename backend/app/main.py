@@ -112,3 +112,27 @@ def read_root(request: Request):
 def health_check(request: Request):
     """Endpoint de verificación de salud del servicio"""
     return {"status": "ok", "message": "Service is running"}
+
+@app.get("/health/db", status_code=status.HTTP_200_OK)
+@limiter.limit("10/minute")
+def database_health_check(request: Request):
+    """Endpoint de verificación de salud de la base de datos"""
+    try:
+        # Test basic database connectivity
+        from .database import supabase
+        response = supabase.table("IB_Projects").select("code").limit(1).execute()
+
+        return {
+            "status": "ok",
+            "message": "Database connection is healthy",
+            "timestamp": request.headers.get("date", "unknown")
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "message": f"Database connection failed: {str(e)}",
+                "timestamp": request.headers.get("date", "unknown")
+            }
+        )
