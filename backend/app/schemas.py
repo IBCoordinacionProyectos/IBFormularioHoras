@@ -36,14 +36,14 @@ class ReportedHourCreate(BaseModel):
     note: Optional[str] = Field(default=None)
 
 class ReportedHourUpdate(BaseModel):
-    date: Optional[date] = Field(default=None)
-    employee_id: Optional[int] = Field(default=None)
-    project_code: Optional[str] = Field(default=None)
-    phase: Optional[str] = Field(default=None)
-    discipline: Optional[str] = Field(default=None)
-    activity: Optional[str] = Field(default=None)
-    hours: Optional[float] = Field(default=None)
-    note: Optional[str] = Field(default=None)
+    date: Optional[date] = None
+    employee_id: Optional[int] = None
+    project_code: Optional[str] = None
+    phase: Optional[str] = None
+    discipline: Optional[str] = None
+    activity: Optional[str] = None
+    hours: Optional[float] = None
+    note: Optional[str] = None
 
 class ReportedHour(ReportedHourCreate):
     id: str  # UUID
