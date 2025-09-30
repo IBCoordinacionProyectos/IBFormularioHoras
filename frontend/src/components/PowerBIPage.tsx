@@ -12,7 +12,7 @@ const PowerBIPage: React.FC<PowerBIPageProps> = ({ onBack }) => {
   const [error, setError] = useState<string | null>(null);
   
   // URL pública del informe de Power BI
-  const powerBIEmbedUrl = 'https://app.powerbi.com/view?r=eyJrIjoiMTI4YzgwOTItOTU5Mi00MGMxLWI4YzYtZjllZDgzNDdmZGNlIiwidCI6IjY5NjA3NDJlLTljMGYtNGI0OC1hYTVlLWJhMTYxY2IwMGViNiJ9';
+  const powerBIEmbedUrl = 'https://ingeniobim.short.gy/IB_HORAS';
   
   // Configuración del iframe
   const iframeStyle = {
