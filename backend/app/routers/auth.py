@@ -50,7 +50,9 @@ async def login(user_credentials: schemas.UserLogin, request: Request):
         password_valid = False
         try:
             # First try to verify as a bcrypt hash
-            password_valid = pwd_context.verify(user_credentials.password, user_password)
+            # Truncate password to 72 bytes to comply with bcrypt limitation
+            truncated_password = user_credentials.password.encode('utf-8')[:72].decode('utf-8')
+            password_valid = pwd_context.verify(truncated_password, user_password)
         except Exception as pwd_e:
             # If that fails, check if it's a plain text password
             if str(pwd_e) == "hash could not be identified":
@@ -85,8 +87,9 @@ async def login(user_credentials: schemas.UserLogin, request: Request):
         # If password was plain text, hash it for future use
         if user_password == user_credentials.password:
             logger.info(f"Migrating plain text password to hash for user: {user_credentials.username}")
-            # Hash the password
-            hashed_password = pwd_context.hash(user_credentials.password)
+            # Hash the password (truncate to 72 bytes to comply with bcrypt limitation)
+            truncated_password = user_credentials.password.encode('utf-8')[:72].decode('utf-8')
+            hashed_password = pwd_context.hash(truncated_password)
             # Update database with hashed_password
             try:
                 crud.update_user_password(user_credentials.username, hashed_password)
