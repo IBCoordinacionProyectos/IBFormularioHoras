@@ -48,35 +48,30 @@ async def login(user_credentials: schemas.UserLogin, request: Request):
 
         # Verify password - handle both hashed and plain text passwords
         password_valid = False
+        
+        # Handle bcrypt length limitation (72 bytes max) by truncating the input password
+        input_password = user_credentials.password
+        if len(input_password.encode('utf-8')) > 72:
+            # Truncate to 72 bytes while preserving UTF-8 character boundaries
+            input_bytes = input_password.encode('utf-8')[:72]
+            input_password = input_bytes.decode('utf-8', errors='ignore')
+        
         try:
             # First try to verify as a bcrypt hash
-            password_valid = pwd_context.verify(user_credentials.password, user_password)
-        except ValueError as pwd_e:
-            # Handle bcrypt length limitation (72 bytes max)
-            if "password cannot be longer than 72 bytes" in str(pwd_e):
-                # Truncate the input password to 72 bytes for verification
-                truncated_password = user_credentials.password.encode('utf-8')[:72].decode('utf-8', errors='ignore')
-                try:
-                    password_valid = pwd_context.verify(truncated_password, user_password)
-                except Exception as trunc_e:
-                    logger.error(f"Password verification failed even with truncation for user {user_credentials.username}: {trunc_e}", exc_info=True)
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="Incorrect username or password",
-                    )
-            else:
-                logger.error(f"Password verification error for user {user_credentials.username}: {pwd_e}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Incorrect username or password",
-                )
+            password_valid = pwd_context.verify(input_password, user_password)
         except Exception as pwd_e:
-            # If that fails, check if it's a plain text password
-            if str(pwd_e) == "hash could not be identified":
+            # If bcrypt verification fails, check if it's a plain text password
+            if "hash could not be identified" in str(pwd_e):
                 # Plain text comparison
                 password_valid = user_credentials.password == user_password
                 if password_valid:
                     logger.info(f"User {user_credentials.username} is using plain text password - should be migrated to hashed")
+            elif "password cannot be longer than 72 bytes" in str(pwd_e):
+                logger.error(f"Password too long for bcrypt after truncation for user {user_credentials.username}: {pwd_e}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Incorrect username or password",
+                )
             else:
                 logger.error(f"Password verification error for user {user_credentials.username}: {pwd_e}", exc_info=True)
                 raise HTTPException(
@@ -95,7 +90,15 @@ async def login(user_credentials: schemas.UserLogin, request: Request):
         if user_password == user_credentials.password:
             logger.info(f"Migrating plain text password to hash for user: {user_credentials.username}")
             try:
-                hashed_password = pwd_context.hash(user_credentials.password)
+                # Ensure the password is within bcrypt length limits before hashing
+                password_to_hash = user_credentials.password
+                if len(password_to_hash.encode('utf-8')) > 72:
+                    # Truncate to 72 bytes while preserving UTF-8 character boundaries
+                    password_bytes = password_to_hash.encode('utf-8')[:72]
+                    password_to_hash = password_bytes.decode('utf-8', errors='ignore')
+                    logger.info(f"Truncated password for hashing (72-byte limit) for user: {user_credentials.username}")
+                
+                hashed_password = pwd_context.hash(password_to_hash)
                 crud.update_user_password(user_credentials.username, hashed_password)
                 logger.info(f"Successfully migrated password for user: {user_credentials.username}")
             except Exception as e:

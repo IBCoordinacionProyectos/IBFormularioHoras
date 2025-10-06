@@ -38,7 +38,15 @@ def test_password_verification():
             print("ERROR: User password is None")
             return False
             
-        password_valid = pwd_context.verify(password, user_password)
+        # Handle bcrypt length limitation (72 bytes max) by truncating the input password
+        input_password = password
+        if len(input_password.encode('utf-8')) > 72:
+            # Truncate to 72 bytes while preserving UTF-8 character boundaries
+            input_bytes = input_password.encode('utf-8')[:72]
+            input_password = input_bytes.decode('utf-8', errors='ignore')
+            print(f"Password truncated for bcrypt verification (72-byte limit): {input_password}")
+        
+        password_valid = pwd_context.verify(input_password, user_password)
         print(f"Password verification result: {password_valid}")
         return password_valid
     except Exception as e:

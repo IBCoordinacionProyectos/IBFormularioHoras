@@ -26,8 +26,16 @@ def test_password_migration():
         except Exception as e:
             if str(e) == "hash could not be identified":
                 print("Password is plain text - needs migration")
+                # Ensure the password is within bcrypt length limits before hashing
+                password_to_hash = "123"
+                if len(password_to_hash.encode('utf-8')) > 72:
+                    # Truncate to 72 bytes while preserving UTF-8 character boundaries
+                    password_bytes = password_to_hash.encode('utf-8')[:72]
+                    password_to_hash = password_bytes.decode('utf-8', errors='ignore')
+                    print(f"Password truncated for hashing (72-byte limit): {password_to_hash}")
+                
                 # Hash the password
-                hashed_password = pwd_context.hash("123")
+                hashed_password = pwd_context.hash(password_to_hash)
                 print(f"Hashed password: {hashed_password}")
                 
                 # Update the database
@@ -40,8 +48,15 @@ def test_password_migration():
                 print(f"Updated stored password: {updated_password}")
                 
                 # Verify it can be validated
+                # Handle bcrypt length limitation (72 bytes max) by truncating the input password
+                input_password = "123"
+                if len(input_password.encode('utf-8')) > 72:
+                    # Truncate to 72 bytes while preserving UTF-8 character boundaries
+                    input_bytes = input_password.encode('utf-8')[:72]
+                    input_password = input_bytes.decode('utf-8', errors='ignore')
+                
                 try:
-                    pwd_context.verify("123", updated_password)
+                    pwd_context.verify(input_password, updated_password)
                     print("SUCCESS: Hashed password verification works")
                     return True
                 except Exception as verify_e:
