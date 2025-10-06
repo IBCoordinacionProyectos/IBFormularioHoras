@@ -325,8 +325,20 @@ const FormularioHoras: React.FC<FormularioHorasProps> = ({ onSuccess, employeeId
     }
   }, [employeeId, fetchStages, fetchDisciplines, fetchActivities]);
 
-  useEffect(() => { fetchProjects(); }, [fetchProjects]);
-  useEffect(() => { refreshDailyActivities(selectedDate, String(employeeId)); }, [selectedDate, employeeId, refreshDailyActivities]);
+   // Load projects on mount but with a small delay to allow UI to render first
+  useEffect(() => {
+     const timer = setTimeout(() => {
+       fetchProjects();
+     }, 100); // Small delay to allow UI to render first
+     return () => clearTimeout(timer);
+   }, [fetchProjects]);
+   
+   // Load daily activities after projects are loaded to avoid race conditions
+  useEffect(() => {
+     if (projects.length > 0) {  // Only load daily activities after projects are loaded
+       refreshDailyActivities(selectedDate, String(employeeId));
+     }
+   }, [selectedDate, employeeId, refreshDailyActivities, projects.length]);
 
   const handleDateChange = (date?: Date) => { if (date) setSelectedDate(date); };
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {

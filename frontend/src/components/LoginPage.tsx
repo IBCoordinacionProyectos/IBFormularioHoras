@@ -22,7 +22,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     setError(null);
     setIsLoading(true);
     try {
-      await new Promise((r) => setTimeout(r, 600));
       const response = await loginUser({ username, password });
       onLoginSuccess(response);
     } catch {

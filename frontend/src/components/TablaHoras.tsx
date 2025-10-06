@@ -105,29 +105,34 @@ const TablaHoras: React.FC = () => {
     };
   };
 
-  // Fetch matrix data for the current month
-  useEffect(() => {
-    const fetchMatrixData = async () => {
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const year = currentMonth.getFullYear();
-        const month = currentMonth.getMonth() + 1; // getMonth() is zero-indexed
-        
-        const groupedData = await getGroupedHoursByEmployee(year, month);
-        const transformedData = transformGroupedData(groupedData);
-        
-        setMatrixData(transformedData);
-      } catch (err: any) {
-        console.error('Error fetching matrix data:', err);
-        setError(err.message || 'Error al cargar el reporte de horas');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMatrixData();
+   // Fetch matrix data for the current month - defer initial load to improve initial page load
+   useEffect(() => {
+     const fetchMatrixData = async () => {
+       setLoading(true);
+       setError(null);
+       
+       try {
+         const year = currentMonth.getFullYear();
+         const month = currentMonth.getMonth() + 1; // getMonth() is zero-indexed
+         
+         const groupedData = await getGroupedHoursByEmployee(year, month);
+         const transformedData = transformGroupedData(groupedData);
+         
+         setMatrixData(transformedData);
+       } catch (err: any) {
+         console.error('Error fetching matrix data:', err);
+         setError(err.message || 'Error al cargar el reporte de horas');
+       } finally {
+         setLoading(false);
+       }
+     };
+ 
+     // Add a small delay to allow initial UI to render first
+     const timer = setTimeout(() => {
+       fetchMatrixData();
+     }, 500); // Small delay to allow other critical resources to load first
+     
+     return () => clearTimeout(timer);
   }, [currentMonth]);
 
   const handlePreviousMonth = () => {
