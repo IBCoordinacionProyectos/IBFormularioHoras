@@ -51,6 +51,25 @@ async def login(user_credentials: schemas.UserLogin, request: Request):
         try:
             # First try to verify as a bcrypt hash
             password_valid = pwd_context.verify(user_credentials.password, user_password)
+        except ValueError as pwd_e:
+            # Handle bcrypt length limitation (72 bytes max)
+            if "password cannot be longer than 72 bytes" in str(pwd_e):
+                # Truncate the input password to 72 bytes for verification
+                truncated_password = user_credentials.password.encode('utf-8')[:72].decode('utf-8', errors='ignore')
+                try:
+                    password_valid = pwd_context.verify(truncated_password, user_password)
+                except Exception as trunc_e:
+                    logger.error(f"Password verification failed even with truncation for user {user_credentials.username}: {trunc_e}", exc_info=True)
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Incorrect username or password",
+                    )
+            else:
+                logger.error(f"Password verification error for user {user_credentials.username}: {pwd_e}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Incorrect username or password",
+                )
         except Exception as pwd_e:
             # If that fails, check if it's a plain text password
             if str(pwd_e) == "hash could not be identified":
