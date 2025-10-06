@@ -75,26 +75,12 @@ async def login(user_credentials: schemas.UserLogin, request: Request):
         # If password was plain text, hash it for future use
         if user_password == user_credentials.password:
             logger.info(f"Migrating plain text password to hash for user: {user_credentials.username}")
-            # Note: In a production environment, you would update the database here
-            # For now, we're just logging that migration is needed
-            # In a real implementation, you would:
-            # 1. Hash the password
-            # 2. Update the database record
-            # hashed_password = pwd_context.hash(user_credentials.password)
-            # supabase.table("IB_Authentication").update({"password": hashed_password}).eq("user", user_credentials.username).execute()
-        # If password was plain text, hash it for future use
-        if user_password == user_credentials.password:
-            logger.info(f"Migrating plain text password to hash for user: {user_credentials.username}")
-            # Hash the password
-            hashed_password = pwd_context.hash(user_credentials.password)
-            # Update database with hashed_password
             try:
+                hashed_password = pwd_context.hash(user_credentials.password)
                 crud.update_user_password(user_credentials.username, hashed_password)
                 logger.info(f"Successfully migrated password for user: {user_credentials.username}")
             except Exception as e:
-                logger.error(f"Failed to update password for user {user_credentials.username}: {e}", exc_info=True)
-
-
+                logger.error(f"Failed to migrate password for user {user_credentials.username}: {e}", exc_info=True)
         # Check if id_members exists and is not None
         member_id = db_user.get('id_members')
         if member_id is None:

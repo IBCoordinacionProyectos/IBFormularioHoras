@@ -17,7 +17,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers['X-Frame-Options'] = 'DENY'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-        response.headers['Content-Security-Policy'] = "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' https://fastapi.tiangolo.com data:; connect-src 'self' https://backend.yeisonduque.top https://supabase.yeisonduque.top"
+        response.headers['Content-Security-Policy'] = "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' https://fastapi.tiangolo.com data: https://*.gravatar.com; connect-src 'self' https://backend.yeisonduque.top https://supabase.yeisonduque.top https://cdn.jsdelivr.net wss: ws:; font-src 'self' https://fonts.gstatic.com;"
         return response
 
 # Initialize rate limiter
@@ -25,45 +25,27 @@ limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI()
 
-# Custom exception handlers to ensure CORS headers are added to all responses
+# Custom exception handlers
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    response = JSONResponse(
+    return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail}
     )
-    # Add CORS headers to the response
-    response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "*")
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Methods"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    return response
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    response = JSONResponse(
+    return JSONResponse(
         status_code=422,
         content={"detail": exc.errors()}
     )
-    # Add CORS headers to the response
-    response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "*")
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Methods"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    return response
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    response = JSONResponse(
+    return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"}
     )
-    # Add CORS headers to the response
-    response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "*")
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Methods"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    return response
 
 # Add rate limiting middleware
 app.state.limiter = limiter
@@ -80,8 +62,9 @@ origins = [
     "https://backend.yeisonduque.top",
     "http://horas.yeisonduque.top",
     "https://horas.yeisonduque.top",
-    "https://www.horas.yeisonduque.top",  # Add www version
-    "*",  # Allow all origins temporarily for debugging
+    "https://www.horas.yeisonduque.top",
+    "https://ibformulariohoras.yeisonduque.top",
+    "https://www.ibformulariohoras.yeisonduque.top",
 ]
 
 app.add_middleware(
