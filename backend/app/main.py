@@ -17,7 +17,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers['X-Frame-Options'] = 'DENY'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-        response.headers['Content-Security-Policy'] = "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' https://fastapi.tiangolo.com data: https://*.gravatar.com; connect-src 'self' https://backend.yeisonduque.top https://supabase.yeisonduque.top https://cdn.jsdelivr.net wss: ws:; font-src 'self' https://fonts.gstatic.com;"
+        response.headers['Content-Security-Policy'] = "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' https://fastapi.tiangolo.com data: https://*.gravatar.com; connect-src 'self' https://backend.yeisonduque.top https://gdbcmjorqafcwmwhyhrn.supabase.co https://cdn.jsdelivr.net wss: ws:; font-src 'self' https://fonts.gstatic.com;"
         return response
 
 # Initialize rate limiter

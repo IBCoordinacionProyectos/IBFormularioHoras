@@ -1,6 +1,9 @@
 import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from dotenv import load_dotenv
-from ..database import supabase
+from app.database import supabase
 
 load_dotenv()
 
